@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="SIMNOVA – moderner SIM-Karten-Shop für Prepaid, Laufzeit, Flex und eSIM.">
+  <title>SIMNOVA — SIM-Karten & Mobilfunktarife</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home"><span class="brand-mark">S</span><span>SIMNOVA</span></a>
+    <nav>
+      <a href="#tarife">Tarife</a><a href="#netze">Netze</a><a href="#hilfe">Hilfe</a>
+    </nav>
+    <button class="cart-button" id="cartOpen" aria-label="Warenkorb öffnen">🛒 <span id="cartCount">0</span></button>
+  </header>
+
+  <main id="home">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">MOBILFUNK • SIM • eSIM</span>
+        <h1>Deine Verbindung.<br><em>Deine Wahl.</em></h1>
+        <p>Prepaid, flexible Tarife und eSIMs von zahlreichen bekannten Mobilfunkmarken – übersichtlich an einem Ort.</p>
+        <div class="hero-actions"><a class="btn primary" href="#tarife">Tarif finden</a><a class="btn ghost" href="#netze">Netze vergleichen</a></div>
+        <div class="trust"><span>✓ Sicherer Checkout</span><span>✓ Rufnummernmitnahme</span><span>✓ SIM & eSIM</span></div>
+      </div>
+      <div class="hero-orbit" aria-hidden="true"><div class="orbit o1"></div><div class="orbit o2"></div><div class="sim-chip">SIM</div></div>
+    </section>
+
+    <section class="quick" id="netze">
+      <button data-network="Alle">Alle Netze</button><button data-network="Telekom">Telekom</button><button data-network="Vodafone">Vodafone</button><button data-network="o2">o2 / Telefónica</button><button data-network="1&1">1&1</button>
+    </section>
+
+    <section class="catalog" id="tarife">
+      <div class="section-head"><div><span class="eyebrow">SHOP</span><h2>Finde deinen Tarif</h2></div><div class="tools"><input id="search" type="search" placeholder="Anbieter oder Tarif suchen …"><select id="type"><option value="all">Alle Arten</option><option value="Prepaid">Prepaid</option><option value="Vertrag">Vertrag</option><option value="Flex">Flex</option><option value="eSIM">eSIM</option></select><select id="sort"><option value="recommended">Empfohlen</option><option value="price">Preis aufsteigend</option><option value="data">Datenvolumen</option></select></div></div>
+      <div class="chips" id="brandFilters"></div>
+      <div class="product-grid" id="products"></div>
+    </section>
+
+    <section class="features" id="hilfe">
+      <article><div class="icon">⚡</div><h3>Schnell startklar</h3><p>Physische SIM oder eSIM – je nach Produkt und Anbieter.</p></article>
+      <article><div class="icon">↔</div><h3>Rufnummer mitnehmen</h3><p>Bei geeigneten Tarifen kannst du deine bestehende Nummer behalten.</p></article>
+      <article><div class="icon">▣</div><h3>Einfach vergleichen</h3><p>Netz, Daten, Laufzeit und Tarifart auf einen Blick.</p></article>
+      <article><div class="icon">✓</div><h3>Identitätsprüfung</h3><p>Mobilfunkverträge werden – abhängig vom Anbieter – vor Aktivierung legitimiert.</p></article>
+    </section>
+
+    <section class="legal-note"><strong>Wichtig:</strong> SIM-Karten in Deutschland sind nicht anonym aktivierbar. Anbieter können Identitätsprüfung, Altersprüfung und weitere Vertragsvoraussetzungen verlangen. Preise, Datenvolumen, Netz und Verfügbarkeit ändern sich. Vor dem Live-Verkauf müssen die jeweiligen Händler-/Resellerverträge und aktuelle Produktdaten eingebunden werden.</section>
+  </main>
+
+  <footer><div><strong>SIMNOVA</strong><p>Mobilfunk. Einfach gewählt.</p></div><div><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Widerruf</a></div><div class="footer-contact">Support<br><span>support@example.de</span></div></footer>
+
+  <aside class="drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><h2>Warenkorb</h2><button id="cartClose">×</button></div><div id="cartItems" class="cart-items"></div><div class="cart-bottom"><div class="total"><span>Zwischensumme</span><strong id="cartTotal">0,00 €</strong></div><button class="btn primary wide" id="checkout">Zur Kasse</button><small>Checkout-Demo: Zahlungs- und Anbieteraktivierung werden im Live-Betrieb über einen autorisierten Zahlungs-/Reseller-Partner angebunden.</small></div></aside>
+  <div class="backdrop" id="backdrop"></div>
+  <div class="modal" id="checkoutModal"><div class="modal-card"><button class="modal-close" id="checkoutClose">×</button><span class="eyebrow">CHECKOUT</span><h2>Bestellung vorbereiten</h2><form id="checkoutForm"><div class="form-grid"><label>Vorname<input required name="firstName"></label><label>Nachname<input required name="lastName"></label><label class="full">E-Mail<input required type="email" name="email"></label><label class="full">Adresse<input required name="address"></label></div><label class="check"><input type="checkbox" required> Ich akzeptiere AGB, Datenschutz und Widerrufsbelehrung.</label><button class="btn primary wide" type="submit">Bestellung absenden</button><p class="form-note">Für Mobilfunkprodukte können zusätzliche Identitäts- und Vertragsdaten erforderlich sein. Es wird noch keine Zahlung ausgelöst.</p></form><div id="success" class="success" hidden>✓ Bestellung vorgemerkt. Der nächste Schritt ist die Verknüpfung mit einem autorisierten Reseller-/Aktivierungs- und Zahlungsdienst.</div></div></div>
+  <script src="app.js"></script>
+</body>
+</html>
