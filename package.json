@@ -1,0 +1,12 @@
+{
+  "name": "webshop-sim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIMNOVA SIM-Karten und eSIM Webshop",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
