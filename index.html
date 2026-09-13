@@ -1,80 +1,20 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#06080d">
-  <meta name="description" content="SIMNOVA – eleganter SIM-Karten-, eSIM- und Mobilfunktarif-Shop.">
-  <title>SIMNOVA — STAY CONNECTED.</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#05070b"><meta name="description" content="Lyca Mobile Triple-SIM – 3-in-1 SIM-Karte.">
+<title>WebSim — Lyca Mobile Triple-SIM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+.product-feature{max-width:1280px;margin:auto;padding:70px 42px 80px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:55px;align-items:start}.product-photo{border:1px solid #202b36;border-radius:26px;overflow:hidden;background:#080d14;box-shadow:0 30px 100px #0008}.product-photo img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover}.product-info h1{font-size:clamp(42px,5vw,70px);line-height:.98;letter-spacing:-.055em;margin:12px 0}.product-info h1 em{font-style:normal;background:linear-gradient(90deg,#c9ffea,#8da5ff);-webkit-background-clip:text;color:transparent}.product-lead{font-size:17px;color:#aeb7c4}.notice{padding:14px 16px;border:1px solid #7cf6d244;border-radius:14px;background:#7cf6d208;margin:22px 0;color:#dce8e5}.benefits{display:grid;gap:9px;margin:22px 0 28px}.benefits div{color:#d7dee7}.benefits b{color:#c9ffea;margin-right:8px}.bulk{border:1px solid #202b36;border-radius:18px;padding:18px;background:#0b1017}.bulk h2{margin:0 0 14px;font-size:20px}.bulk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.bulk-item{padding:12px;border:1px solid #202b36;border-radius:12px;text-align:center;background:#ffffff03}.bulk-item strong{display:block;font-size:20px}.bulk-item small{color:#8f9aaa}.buy-row{display:flex;gap:10px;align-items:center;margin-top:14px}.qty{display:flex;border:1px solid #202b36;border-radius:11px;overflow:hidden}.qty button{width:42px;background:#080c12;border:0;color:#fff;font-size:20px;cursor:pointer}.qty span{min-width:48px;display:grid;place-items:center}.buy-row .btn{flex:1}.contact-box{max-width:1280px;margin:0 auto 80px;padding:28px 42px;border:1px solid #202b36;border-radius:22px;background:linear-gradient(100deg,#0d1718,#0a0e14);display:grid;grid-template-columns:1fr 1fr;gap:18px}.contact-card{padding:22px;border:1px solid #ffffff12;border-radius:16px}.contact-card h3{margin-top:0}.placeholder{color:#c9ffea;font-weight:800}.legal-note{margin-bottom:60px}@media(max-width:850px){.product-feature{grid-template-columns:1fr;padding:45px 20px 60px}.contact-box{margin:0 20px 60px;padding:20px;grid-template-columns:1fr}.bulk-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:500px){.bulk-grid{grid-template-columns:1fr 1fr}.buy-row{align-items:stretch;flex-direction:column}.qty{width:100%;justify-content:space-between}.qty button{flex:1}}
+</style>
 </head>
 <body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-  <header class="topbar">
-    <a class="brand" href="#home" aria-label="SIMNOVA Startseite"><span class="brand-mark">S</span><span>SIMNOVA</span></a>
-    <nav class="main-nav" aria-label="Hauptnavigation">
-      <a href="#tarife">SIM-Karten</a><a href="#esim">eSIM</a><a href="#prepaid">Prepaid</a><a href="#vertrag">Vertrag</a><a href="#anbieter">Anbieter</a><a href="#hilfe">Hilfe</a>
-    </nav>
-    <div class="top-actions"><button class="icon-btn" aria-label="Suche" onclick="document.getElementById('search').focus()">⌕</button><button class="icon-btn" aria-label="Konto">◯</button><button class="cart-button" id="cartOpen" aria-label="Warenkorb öffnen">Bag <span id="cartCount">0</span></button></div>
-  </header>
-
-  <main id="home">
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="eyebrow"><span class="pulse"></span> SIM • eSIM • MOBILFUNK</div>
-        <h1>Deine Verbindung.<br><em>Deine Wahl.</em></h1>
-        <p>Entdecke SIM-Karten, eSIMs und Mobilfunktarife verschiedener Anbieter – elegant, schnell und übersichtlich an einem Ort.</p>
-        <div class="hero-actions"><a class="btn primary" href="#tarife">Tarif entdecken <span>↗</span></a><a class="btn ghost" href="#anbieter">Anbieter ansehen</a></div>
-        <div class="trust"><span>✓ SIM & eSIM</span><span>✓ Rufnummernmitnahme</span><span>✓ Sicherer Checkout</span></div>
-      </div>
-      <div class="hero-visual" aria-label="SIM-Karte und weltweites Mobilfunknetz">
-        <div class="globe"><div class="glow"></div><div class="grid-lines"></div><div class="continent c1"></div><div class="continent c2"></div><div class="network-dot d1"></div><div class="network-dot d2"></div><div class="network-dot d3"></div></div>
-        <div class="hero-sim"><div class="sim-metal"></div><b>SIM</b><small>SIMNOVA</small></div>
-        <div class="orbit o1"></div><div class="orbit o2"></div>
-      </div>
-    </section>
-
-    <section class="provider-strip" id="anbieter">
-      <div class="strip-title">ANBIETER & NETZE</div>
-      <div class="provider-logos" id="providerLogos"></div>
-    </section>
-
-    <section class="category-row" id="esim">
-      <a class="category-card featured" href="#tarife" data-type-link="eSIM"><span>eSIM</span><strong>SOFORT DIGITAL</strong><small>Ohne Plastik. Direkt auf dein Gerät.</small><b>→</b></a>
-      <a class="category-card" href="#tarife" data-type-link="Prepaid"><span>PREPAID</span><strong>FLEXIBEL BLEIBEN</strong><small>Volle Kontrolle ohne lange Bindung.</small><b>→</b></a>
-      <a class="category-card" href="#tarife" data-type-link="Vertrag"><span>VERTRAG</span><strong>MEHR DATEN</strong><small>Starke Pakete für jeden Alltag.</small><b>→</b></a>
-    </section>
-
-    <section class="catalog" id="tarife">
-      <div class="section-head"><div><span class="eyebrow">SHOP / TARIFE</span><h2>Finde deine Verbindung.</h2><p>Wähle Marke, Netz und Tarifart. Neue Anbieter können jederzeit ergänzt werden.</p></div><div class="tools"><input id="search" type="search" placeholder="Anbieter oder Tarif …" aria-label="Tarife suchen"><select id="type" aria-label="Tarifart"><option value="all">Alle Arten</option><option value="Prepaid">Prepaid</option><option value="Vertrag">Vertrag</option><option value="Flex">Flex</option><option value="eSIM">eSIM</option></select><select id="sort" aria-label="Sortierung"><option value="recommended">Empfohlen</option><option value="price">Preis aufsteigend</option><option value="data">Datenvolumen</option></select></div></div>
-      <div class="network-tabs" id="networkTabs"><button data-network="Alle" class="active">Alle</button><button data-network="Telekom">Telekom</button><button data-network="Vodafone">Vodafone</button><button data-network="o2">o2 / Telefónica</button><button data-network="1&1">1&1</button></div>
-      <div class="chips" id="brandFilters"></div>
-      <div class="product-grid" id="products"></div>
-    </section>
-
-    <section class="add-brand" id="prepaid">
-      <div><span class="eyebrow">OFFEN FÜR NEUE MARKEN</span><h2>Dein Anbieter fehlt?</h2><p>Kein Problem: Lade später einfach Logo- und Produktbilder in <code>assets/sim/</code> hoch und ergänze den Anbieter im Produktkatalog.</p></div>
-      <div class="folder-card"><span>assets/sim/</span><strong>+ BRAND / PRODUKT</strong><small>JPG · PNG · WEBP · SVG</small></div>
-    </section>
-
-    <section class="features" id="hilfe">
-      <article><div class="icon">◎</div><h3>eSIM ready</h3><p>Digitale Tarife lassen sich im Katalog separat filtern.</p></article>
-      <article><div class="icon">↔</div><h3>Rufnummer mitnehmen</h3><p>Hinweise zur Portierung können je Tarif hinterlegt werden.</p></article>
-      <article><div class="icon">◈</div><h3>Alle wichtigen Daten</h3><p>Netz, GB, 5G/LTE, Allnet und Tarifart direkt auf der Karte.</p></article>
-      <article><div class="icon">✓</div><h3>Ident-Verfahren</h3><p>Im Live-Betrieb werden Identifikation und Aktivierung über den jeweiligen Partner angebunden.</p></article>
-    </section>
-
-    <section class="legal-note"><strong>Live-Shop-Hinweis:</strong> Das Frontend ist als vollständige Shop-Oberfläche vorbereitet. Für den echten Verkauf müssen autorisierte Reseller-/Providerverträge, aktuelle Tarifdaten, Identitätsprüfung, Zahlungsdienst, Aktivierung und rechtliche Shop-Dokumente angebunden werden.</section>
-  </main>
-
-  <footer><div><strong>SIMNOVA</strong><p>STAY CONNECTED.</p></div><div class="footer-links"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Widerruf</a></div><div class="footer-contact">SUPPORT<br><span>support@example.de</span></div></footer>
-
-  <aside class="drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><div><span class="eyebrow">DEIN SHOP</span><h2>Warenkorb</h2></div><button id="cartClose" aria-label="Warenkorb schließen">×</button></div><div id="cartItems" class="cart-items"></div><div class="cart-bottom"><div class="total"><span>Zwischensumme</span><strong id="cartTotal">0,00 €</strong></div><button class="btn primary wide" id="checkout">Zur Kasse</button><small>Demo-Checkout. Zahlung und Mobilfunk-Aktivierung werden im Live-Betrieb über autorisierte Partner ausgeführt.</small></div></aside>
-  <div class="backdrop" id="backdrop"></div>
-  <div class="modal" id="checkoutModal"><div class="modal-card"><button class="modal-close" id="checkoutClose" aria-label="Checkout schließen">×</button><span class="eyebrow">CHECKOUT</span><h2>Bestellung vorbereiten</h2><form id="checkoutForm"><div class="form-grid"><label>Vorname<input required name="firstName"></label><label>Nachname<input required name="lastName"></label><label class="full">E-Mail<input required type="email" name="email"></label><label class="full">Adresse<input required name="address"></label></div><label class="check"><input type="checkbox" required> Ich akzeptiere AGB, Datenschutz und Widerrufsbelehrung.</label><button class="btn primary wide" type="submit">Bestellung absenden</button><p class="form-note">Je nach Produkt können zusätzliche Identitäts- und Vertragsdaten erforderlich sein. Es wird noch keine Zahlung ausgelöst.</p></form><div id="success" class="success" hidden>✓ Bestellung vorgemerkt. Der nächste Schritt ist die Verknüpfung mit Zahlungs-, Reseller- und Aktivierungsdiensten.</div></div></div>
-  <script src="app.js"></script>
-</body>
-</html>
+<header class="topbar"><a class="brand" href="#home" aria-label="WebSim Startseite"><span class="brand-mark">W</span><span>WEBSIM</span></a><nav class="main-nav"><a href="#produkt">SIM-Karte</a><a href="#vorteile">Vorteile</a><a href="#preise">Mengenpreise</a><a href="#kontakt">Kontakt</a></nav><div class="top-actions"><button class="icon-btn" aria-label="Suche">⌕</button><button class="cart-button" id="cartOpen">Warenkorb <span id="cartCount">0</span></button></div></header>
+<main id="home"><section class="product-feature" id="produkt"><div class="product-photo"><img src="assets/sim/lyca-triple-sim.svg" alt="Lyca Mobile Triple-SIM 3-in-1 SIM-Karte"></div><div class="product-info"><span class="eyebrow">SIM-KARTE · LYCA MOBILE</span><h1>Lyca Mobile <em>Triple-SIM</em></h1><p class="product-lead">🔐 Für alle, die Wert auf Privatsphäre und eine klare Trennung ihrer mobilen Kommunikation legen.</p><p>Die Lyca Mobile Triple-SIM ist eine praktische 3-in-1-SIM für eine zusätzliche Mobilfunkkarte. Die SIM-Karte ist bereits aktiviert und kann nach einer Mindestaufladung von 5 € genutzt werden.</p><div class="notice">📱 <strong>Bereits aktiviert</strong> · Mindestens 5 € Guthaben aufladen, anschließend nutzbar.</div><div class="benefits" id="vorteile"><div><b>✓</b>Lyca Mobile Triple-SIM / 3-in-1-SIM</div><div><b>✓</b>Standard-, Micro- und Nano-SIM in einer Karte</div><div><b>✓</b>Telefonie &amp; SMS</div><div><b>✓</b>Mobiles Internet je nach gebuchtem Tarif</div><div><b>✓</b>Gute Netzabdeckung über das von Lyca Mobile genutzte Mobilfunknetz</div><div><b>✓</b>Separate Mobilfunknummer für Menschen mit erhöhtem Privatsphäre-Anspruch</div><div><b>✓</b>🇩🇪 Deutsche Nummer</div></div><div class="bulk" id="preise"><h2>📦 Mengenpreise</h2><div class="bulk-grid"><div class="bulk-item"><small>10 Stück</small><strong>7,00 €</strong><small>pro Stück</small></div><div class="bulk-item"><small>50 Stück</small><strong>5,00 €</strong><small>pro Stück</small></div><div class="bulk-item"><small>100 Stück</small><strong>4,50 €</strong><small>pro Stück</small></div><div class="bulk-item"><small>200 Stück</small><strong>4,00 €</strong><small>pro Stück</small></div><div class="bulk-item"><small>250 Stück</small><strong>3,80 €</strong><small>pro Stück</small></div><div class="bulk-item"><small>500 Stück</small><strong>3,50 €</strong><small>pro Stück</small></div></div><div class="buy-row"><div class="qty"><button type="button" onclick="changeQty(-1)">−</button><span id="qtyValue">10</span><button type="button" onclick="changeQty(1)">+</button></div><button class="btn primary" type="button" onclick="addLyca()">In den Warenkorb</button></div></div></div></section><section class="contact-box" id="kontakt"><div class="contact-card"><h3>Telegram</h3><p>Bestellungen und Fragen direkt per Telegram.</p><span class="placeholder">Kontakt wird noch eingetragen</span></div><div class="contact-card"><h3>WhatsApp</h3><p>Bestellungen und Fragen direkt per WhatsApp.</p><span class="placeholder">Nummer wird noch eingetragen</span></div></section><section class="legal-note"><strong>Hinweis:</strong> Die Angaben zur Aktivierung, Mindestaufladung, Netzabdeckung und Nutzung stammen aus der bereitgestellten Produktbeschreibung und sollten vor dem Live-Verkauf mit dem autorisierten Anbieter/Reseller geprüft werden. Es wird aktuell noch keine echte Zahlung ausgelöst.</section></main>
+<aside class="drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><div><span class="eyebrow">DEIN SHOP</span><h2>Warenkorb</h2></div><button id="cartClose">×</button></div><div id="cartItems" class="cart-items"></div><div class="cart-bottom"><div class="total"><span>Zwischensumme</span><strong id="cartTotal">0,00 €</strong></div><button class="btn primary wide" id="checkout">Zur Kasse</button><small>Demo-Checkout. Zahlung und Aktivierung sind noch nicht angebunden.</small></div></aside><div class="backdrop" id="backdrop"></div>
+<div class="modal" id="checkoutModal"><div class="modal-card"><button class="modal-close" id="checkoutClose">×</button><span class="eyebrow">BESTELLUNG</span><h2>Bestellung vorbereiten</h2><form id="checkoutForm"><div class="form-grid"><label>Vorname<input required name="firstName"></label><label>Nachname<input required name="lastName"></label><label class="full">E-Mail<input required type="email" name="email"></label><label class="full">Adresse<input required name="address"></label></div><label class="check"><input type="checkbox" required> Ich akzeptiere AGB, Datenschutz und Widerrufsbelehrung.</label><button class="btn primary wide" type="submit">Bestellung absenden</button><p class="form-note">Es wird noch keine Zahlung ausgelöst.</p></form><div id="success" class="success" hidden>✓ Bestellung vorgemerkt.</div></div></div>
+<script src="app.js"></script><script>let selectedQty=10;function changeQty(d){selectedQty=Math.max(10,selectedQty+(d*10));document.getElementById('qtyValue').textContent=selectedQty}function addLyca(){window.addLycaProduct(selectedQty)}</script>
+</body></html>
