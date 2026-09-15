@@ -1,7 +1,7 @@
 const token=process.env.TELEGRAM_BOT_TOKEN;
 let adminChatId=process.env.TELEGRAM_ADMIN_CHAT_ID||null;
 let offset=0;
-const botUsername=(process.env.TELEGRAM_BOT_USERNAME||'Lyca_Bot').replace(/^@/,'');
+const botUsername=(process.env.TELEGRAM_BOT_USERNAME||'Lyca_webshop_bot').replace(/^@/,'');
 const api=token?`https://api.telegram.org/bot${token}`:null;
 async function tg(method,body){if(!api)throw new Error('TELEGRAM_BOT_TOKEN missing');const r=await fetch(`${api}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.description||'Telegram API error');return j.result}
 async function send(chatId,text,extra={}){return tg('sendMessage',{chat_id:chatId,text,...extra})}
