@@ -1,0 +1,18 @@
+{
+  "brand": "Webshop SIM",
+  "payment_wallets": {
+    "BTC": "bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx",
+    "SOL": "2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA",
+    "BNB_SMART_CHAIN": "0x7f6dde8179319425917eD0c9fd84952f98b0C2A4"
+  },
+  "telegram": {
+    "enabled": false,
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "chat_id_env": "TELEGRAM_CHAT_ID"
+  },
+  "balance_display": {
+    "enabled": true,
+    "source": "blockchain_api",
+    "note": "Never store private keys in this repository. Balances must be queried from public wallet addresses."
+  }
+}
