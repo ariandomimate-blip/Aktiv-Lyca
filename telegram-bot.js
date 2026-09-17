@@ -4,7 +4,8 @@ const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop_Bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
-const adminChatId = String(process.env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
+const adminChatIds = String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '')
+  .split(',').map(x => x.trim()).filter(Boolean);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 
 const wallets = {
@@ -51,7 +52,16 @@ function getOrder(id) { return orders.get(String(id || '').trim()) || null; }
 async function sendOrder(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
-  if (token && adminChatId) await sendMessage(adminChatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
+  if (token && adminChatIds.length) {
+    for (const chatId of adminChatIds) {
+      try {
+        const result = await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
+        if (!result.ok) console.error(`Lyca Bot: admin delivery failed for ${chatId}: ${result.description || 'unknown error'}`);
+      } catch (err) {
+        console.error(`Lyca Bot: admin delivery exception for ${chatId}:`, err.message);
+      }
+    }
+  }
   return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order) };
 }
 
@@ -98,7 +108,7 @@ async function handleUpdate(update) {
     return;
   }
   if (command === '/paid' || command === '/unpaid') {
-    if (!adminChatId || String(chatId) !== adminChatId) {
+    if (!adminChatIds.includes(String(chatId))) {
       await sendMessage(chatId, 'Dieser Befehl ist nur für den Shop-Administrator verfügbar.');
       return;
     }
@@ -134,7 +144,7 @@ async function configure(baseUrl = publicBaseUrl) {
 
 module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
-  sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
+  adminChatIds, sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
   invoiceText, webhookSecret, supportUsername
 };
