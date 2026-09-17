@@ -1,10 +1,10 @@
-const crypto = require('crypto');
-
 const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_webshop1_bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
+const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
+if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 
 const wallets = {
@@ -13,6 +13,8 @@ const wallets = {
   BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
 };
 
+// Orders are kept in memory for the running service. The order deep-link is
+// intended for the immediate post-checkout flow.
 const orders = new Map();
 const sessions = new Map();
 
@@ -26,10 +28,25 @@ function invoiceText(order) {
   return `🧾 LYCA WEBSHOP · RECHNUNG / BESTELLBESTÄTIGUNG\n\nRechnungsnummer: ${order.invoiceNumber}\nBestellnummer: ${order.orderNumber}\nDatum: ${order.createdAt}\n\nKunde: ${order.customer.name}\nAdresse: ${order.customer.address}\nE-Mail: ${order.customer.email}\n\n${order.items.map(x => `• ${x.name} | Menge: ${x.qty} | ${formatMoney(x.price)} / Stück`).join('\n')}\n\nGesamt: ${formatMoney(order.total)}\nZahlungsstatus: ${order.paymentStatus}\n\nSupport: @${supportUsername}`;
 }
 
+function botOrderUrl(orderNumber) {
+  return `https://t.me/${botUsername}?start=${encodeURIComponent(String(orderNumber))}`;
+}
+
+function supportUrl(order) {
+  const text = order
+    ? `Hallo Lyca Support, ich brauche Hilfe zu meiner Bestellung ${order.orderNumber}.\n\n${invoiceText(order)}`
+    : `Hallo Lyca Support, ich brauche Hilfe zu meiner Lyca-Webshop-Bestellung.`;
+  return `https://t.me/${supportUsername}?text=${encodeURIComponent(text)}`;
+}
+
 function makeKeyboard(orderNumber) {
   const rows = [[{ text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl } }]];
-  if (orderNumber) rows.push([{ text: '🧾 Bestellung / Rechnung', callback_data: `order:${orderNumber}` }]);
-  rows.push([{ text: '💬 Support', url: `https://t.me/${supportUsername}` }]);
+  if (orderNumber) {
+    rows.push([{ text: '🧾 Rechnung öffnen', url: botOrderUrl(orderNumber) }]);
+    rows.push([{ text: '💬 Support', url: supportUrl(getOrder(orderNumber)) }]);
+  } else {
+    rows.push([{ text: '💬 Support', url: `https://t.me/${supportUsername}` }]);
+  }
   return { inline_keyboard: rows };
 }
 
@@ -60,7 +77,15 @@ async function sendOrder(order) {
       console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message);
     }
   }
-  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length };
+  return {
+    ok: true,
+    orderNumber: order.orderNumber,
+    botUsername,
+    message: formatOrder(order),
+    adminRecipients: recipients.length,
+    invoiceUrl: botOrderUrl(order.orderNumber),
+    supportUrl: supportUrl(order)
+  };
 }
 
 async function handleUpdate(update) {
@@ -89,18 +114,26 @@ async function handleUpdate(update) {
     const order = getOrder(parts[1]);
     sessions.set(String(chatId), { lastOrder: order?.orderNumber || null });
     if (isSupportAdmin) {
-      await sendMessage(chatId, '🛠️ Lyca Support ist als Administrator verbunden.\n\nNeue Bestellungen werden an die konfigurierten Administratoren gesendet.\nDu kannst /paid BESTELLNUMMER oder /unpaid BESTELLNUMMER verwenden.', { reply_markup: makeKeyboard() });
+      await sendMessage(chatId, '🛠️ Lyca Support ist als Administrator verbunden.\n\nNeue Bestellungen werden an die konfigurierten Administratoren gesendet.\n\nDeine Chat-ID: ' + chatId + '\n\nDu kannst /paid BESTELLNUMMER oder /unpaid BESTELLNUMMER verwenden.', { reply_markup: makeKeyboard() });
       return;
     }
     if (order) {
       await sendMessage(chatId, `✅ Bestellung ${order.orderNumber} wurde gefunden.\n\n${invoiceText(order)}`, { reply_markup: makeKeyboard(order.orderNumber) });
     } else {
-      await sendMessage(chatId, `🤖 Willkommen beim Lyca Webshop!\n\n🛍️ Über den Button unten öffnest du den Shop.\n🧾 Nach dem Checkout erhältst du hier deine private Bestellbestätigung und Rechnung.`, { reply_markup: makeKeyboard() });
+      await sendMessage(chatId, `🤖 Willkommen beim Lyca Webshop!\n\n🛍️ Über den Button unten öffnest du den Shop.\n🧾 Nach dem Checkout kannst du deine Bestellbestätigung/Rechnung hier über den Rechnungslink öffnen.`, { reply_markup: makeKeyboard() });
     }
+    return;
+  }
+  if (command === '/myid') {
+    await sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`);
     return;
   }
   if (command === '/shop') {
     await sendMessage(chatId, '🛍️ Lyca Webshop', { reply_markup: makeKeyboard() });
+    return;
+  }
+  if (command === '/support') {
+    await sendMessage(chatId, `💬 Lyca Support: @${supportUsername}`, { reply_markup: makeKeyboard() });
     return;
   }
   if (command === '/order') {
@@ -124,7 +157,7 @@ async function handleUpdate(update) {
     await sendMessage(chatId, `✅ ${order.orderNumber}: ${order.paymentStatus}`, { reply_markup: makeKeyboard(order.orderNumber) });
     return;
   }
-  await sendMessage(chatId, 'Nutze /shop, /order BESTELLNUMMER oder /invoice BESTELLNUMMER.', { reply_markup: makeKeyboard() });
+  await sendMessage(chatId, 'Nutze /shop, /order BESTELLNUMMER, /invoice BESTELLNUMMER, /support oder /myid.', { reply_markup: makeKeyboard() });
 }
 
 async function configure(baseUrl = publicBaseUrl) {
@@ -142,7 +175,9 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'start', description: 'Bot starten' },
     { command: 'shop', description: 'Webshop öffnen' },
     { command: 'order', description: 'Bestellung anzeigen' },
-    { command: 'invoice', description: 'Rechnung anzeigen' }
+    { command: 'invoice', description: 'Rechnung anzeigen' },
+    { command: 'support', description: 'Support kontaktieren' },
+    { command: 'myid', description: 'Telegram Chat-ID anzeigen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
   return { enabled: true, username: me.result.username, webhook: `${baseUrl || ''}/api/telegram-webhook` };
@@ -152,5 +187,6 @@ module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
   sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
-  invoiceText, webhookSecret, supportUsername
+  invoiceText, webhookSecret, supportUsername, supportChatId,
+  botOrderUrl, supportUrl
 };
