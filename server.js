@@ -52,9 +52,9 @@ async function telegramOrder(req, res) {
     };
     const result = await telegram.sendOrder(order);
     const invoiceText = formatInvoice(order);
-    // Open the support user's private chat with the complete order/invoice prefilled.
-    // Telegram still requires the customer to press Send; the bot separately notifies configured administrators.
-    const supportUrl = `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
+    // Telegram opens the support chat with the complete order/invoice prefilled.
+    // The customer still has to press Send because Telegram does not let a website send as the user.
+    const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
     sendJson(res, 201, {
       ok:true,
       order_number:orderNumber,
@@ -65,9 +65,10 @@ async function telegramOrder(req, res) {
       admin_recipients:result.adminRecipients,
       bot_message:result.message,
       invoice:invoiceText,
+      invoice_url:result.invoiceUrl || telegram.botOrderUrl(orderNumber),
       support_username:SUPPORT_USERNAME,
       support_url:supportUrl,
-      telegram_url:supportUrl,
+      telegram_url:result.invoiceUrl || telegram.botOrderUrl(orderNumber),
       shop_url:PUBLIC_BASE_URL
     });
   } catch (err) {
