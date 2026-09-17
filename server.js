@@ -6,7 +6,7 @@ const telegram = require('./telegram-bot');
 
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshopsim1.onrender.com').replace(/\/$/, '');
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const CANONICAL_HOST = 'aktiv-lyca.de';
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
@@ -55,7 +55,7 @@ async function telegramOrder(req, res) {
     const invoiceText = formatInvoice(order);
     const botUrl = `https://t.me/${telegram.username}?start=${encodeURIComponent(orderNumber)}`;
     const supportUrl = `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
-    sendJson(res, 201, {ok:true, order_number:orderNumber, invoice_number:invoiceNumber, payment_status:order.paymentStatus, bot_username:telegram.username, bot_mode:telegram.tokenConfigured ? 'telegram-api' : 'token-missing', bot_message:result.message, invoice:invoiceText, support_username:SUPPORT_USERNAME, support_url:supportUrl, telegram_url:botUrl});
+    sendJson(res, 201, {ok:true, order_number:orderNumber, invoice_number:invoiceNumber, payment_status:order.paymentStatus, bot_username:telegram.username, bot_mode:telegram.tokenConfigured ? 'telegram-api' : 'token-missing', admin_recipients:result.adminRecipients, bot_message:result.message, invoice:invoiceText, support_username:SUPPORT_USERNAME, support_url:supportUrl, telegram_url:botUrl, shop_url:PUBLIC_BASE_URL});
   } catch (err) {
     console.error('Lyca order error:', err);
     sendJson(res, 500, {error:err.message || 'Bestellung konnte nicht verarbeitet werden.'});
@@ -69,7 +69,7 @@ async function telegramWebhook(req, res) {
 }
 
 async function telegramStatus(req,res) {
-  sendJson(res,200,{ok:true,telegram_enabled:telegram.tokenConfigured,bot_enabled:true,bot_username:telegram.username,bot_mode:telegram.tokenConfigured?'telegram-api':'token-missing',webhook:`${PUBLIC_BASE_URL}/api/telegram-webhook`,support_username:SUPPORT_USERNAME,support_url:SUPPORT_URL,message:telegram.tokenConfigured?'Telegram Bot API is configured by environment variables.':'TELEGRAM_BOT_TOKEN is missing in Render.'});
+  sendJson(res,200,{ok:true,telegram_enabled:telegram.tokenConfigured,bot_enabled:true,bot_username:telegram.username,bot_mode:telegram.tokenConfigured?'telegram-api':'token-missing',webhook:`${PUBLIC_BASE_URL}/api/telegram-webhook`,shop_url:PUBLIC_BASE_URL,support_username:SUPPORT_USERNAME,support_url:SUPPORT_URL,message:telegram.tokenConfigured?'Telegram Bot API is configured by environment variables.':'TELEGRAM_BOT_TOKEN is missing in Render.'});
 }
 
 async function setupTelegram() {
