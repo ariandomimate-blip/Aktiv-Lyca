@@ -50,6 +50,22 @@ async function sendMessage(chatId, text, extra = {}) { return api('sendMessage',
 async function sendBusinessMessage(connectionId, chatId, text, extra = {}) {
   return api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra });
 }
+async function getBusinessConnection(connectionId) {
+  const id = String(connectionId || '');
+  if (!id) return null;
+  const cached = businessConnections.get(id);
+  if (cached) return cached;
+  try {
+    const result = await api('getBusinessConnection', { business_connection_id: id });
+    if (result.ok && result.result) {
+      businessConnections.set(id, result.result);
+      return result.result;
+    }
+  } catch (err) {
+    console.error('Lyca Business connection lookup failed:', err.message);
+  }
+  return null;
+}
 
 function saveOrder(order) { orders.set(order.orderNumber, order); return order; }
 function getOrder(id) { return orders.get(String(id || '').trim()) || null; }
@@ -58,6 +74,7 @@ async function sendOrder(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
   const recipients = Array.from(adminChatIds);
+  if (!recipients.length) console.error('Lyca Bot: no admin recipients configured');
   for (const chatId of recipients) {
     try {
       const result = await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
@@ -90,10 +107,13 @@ async function handleBusinessConnection(connection) {
 async function handleBusinessMessage(msg) {
   const connectionId = String(msg.business_connection_id || '');
   if (!connectionId || !msg.chat) return;
-  const connection = businessConnections.get(connectionId);
+  const connection = await getBusinessConnection(connectionId);
   if (connection && connection.is_enabled === false) return;
   const rights = connection?.rights || {};
-  if (connection && rights.can_reply === false) return;
+  if (connection && rights.can_reply === false) {
+    console.error(`Lyca Business reply skipped: can_reply=false for connection ${connectionId}`);
+    return;
+  }
   const text = String(msg.text || '').trim();
   if (!text) return;
   const reply = businessReplyText(text);
@@ -185,7 +205,7 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'myid', description: 'Telegram Chat-ID anzeigen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
-  return { enabled: true, username: me.result.username, webhook: `${baseUrl || ''}/api/telegram-webhook`, businessMode: true };
+  return { enabled: true, username: me.result.username, webhook: `${baseUrl || ''}/api/telegram-webhook`, businessMode: true, miniAppUrl: baseUrl };
 }
 
 module.exports = {
