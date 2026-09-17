@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "description": "WebSim – Lyca Mobile Triple-SIM Webshop",
-  "scripts": {"start": "node server.js"},
+  "scripts": {"start": "node telegram-start-patch.js && node server.js"},
   "engines": {"node": ">=20"}
 }
