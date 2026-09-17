@@ -20,6 +20,7 @@ const root = __dirname;
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
+const BOT_INVITE_URL = `https://t.me/${telegram.username}`;
 const mimeTypes = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.ico':'image/x-icon' };
 
 function safePath(urlPath) {
@@ -44,6 +45,59 @@ function sendJson(res, status, payload) {
 function makeOrderNumber() { const d = new Date(); const stamp = d.toISOString().slice(0,10).replace(/-/g,''); const rnd = crypto.randomBytes(3).toString('hex').toUpperCase(); return `LYCA-${stamp}-${rnd}`; }
 function makeInvoiceNumber(orderNumber) { return orderNumber.replace(/^LYCA-/, 'LYCA-RE-'); }
 function formatInvoice(order) { return telegram.invoiceText(order); }
+
+async function telegramApi(method, body = {}) {
+  const token = normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
+  if (!token) return { ok:false, description:'TELEGRAM_BOT_TOKEN fehlt' };
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
+    return await r.json();
+  } catch (err) {
+    return { ok:false, description:err.message || 'Telegram API request failed' };
+  }
+}
+
+const BOT_DESCRIPTION = 'Willkommen im Lyca Webshop! 🛍️ Lyca Mobile Triple-SIM bequem online bestellen. Warenkorb, Bestellung und Rechnung direkt über Telegram. Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB – je nach freigeschalteter Zahlungsoption. Support: @' + SUPPORT_USERNAME;
+const BOT_SHORT_DESCRIPTION = 'Lyca Webshop 🛍️ Triple-SIM · Bestellung · Rechnung · BTC · SOL · BNB';
+const BOT_COMMANDS = [
+  { command:'start', description:'Lyca Webshop starten' },
+  { command:'products', description:'Produkte und Preise anzeigen' },
+  { command:'cart', description:'Warenkorb anzeigen' },
+  { command:'orders', description:'Bestellungen anzeigen' },
+  { command:'shop', description:'Webshop öffnen' },
+  { command:'support', description:'Support kontaktieren' },
+  { command:'payment', description:'Zahlungsarten anzeigen' },
+  { command:'cancel', description:'Vorgang abbrechen' }
+];
+
+async function configureTelegramProfile() {
+  if (!normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN)) return { ok:false, description:'Token fehlt' };
+  const results = {};
+  results.description = await telegramApi('setMyDescription', { description:BOT_DESCRIPTION });
+  results.shortDescription = await telegramApi('setMyShortDescription', { short_description:BOT_SHORT_DESCRIPTION });
+  results.commands = await telegramApi('setMyCommands', { commands:BOT_COMMANDS });
+  return results;
+}
+
+async function telegramDiagnostics() {
+  const tokenConfigured = Boolean(normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN));
+  if (!tokenConfigured) return { ok:false, tokenConfigured:false, authenticated:false, reason:'TELEGRAM_BOT_TOKEN fehlt' };
+  const me = await telegramApi('getMe');
+  const webhook = await telegramApi('getWebhookInfo');
+  return {
+    ok: Boolean(me.ok),
+    tokenConfigured:true,
+    authenticated:Boolean(me.ok),
+    bot: me.ok && me.result ? { id:me.result.id, username:me.result.username, firstName:me.result.first_name, isBot:me.result.is_bot } : null,
+    telegramError: me.ok ? null : (me.description || 'Unauthorized'),
+    webhook: webhook.ok ? {
+      url:webhook.result.url || '',
+      pendingUpdateCount:webhook.result.pending_update_count || 0,
+      lastErrorMessage:webhook.result.last_error_message || null
+    } : null,
+    webhookError: webhook.ok ? null : (webhook.description || 'Webhook status unavailable')
+  };
+}
 
 async function telegramOrder(req, res) {
   try {
@@ -93,17 +147,67 @@ async function telegramWebhook(req, res) {
 }
 
 async function telegramStatus(req,res) {
-  sendJson(res,200,{ok:true,telegram_enabled:telegram.tokenConfigured,bot_enabled:true,bot_username:telegram.username,bot_mode:telegram.tokenConfigured?'telegram-api':'token-missing',webhook:`${PUBLIC_BASE_URL}/api/telegram-webhook`,shop_url:PUBLIC_BASE_URL,support_username:SUPPORT_USERNAME,support_url:SUPPORT_URL,message:telegram.tokenConfigured?'Telegram Bot API is configured by environment variables.':'TELEGRAM_BOT_TOKEN is missing in Render.'});
+  const diagnostics = await telegramDiagnostics();
+  sendJson(res,200,{
+    ok:true,
+    telegram_enabled:diagnostics.authenticated,
+    bot_enabled:true,
+    bot_username:telegram.username,
+    bot_mode:diagnostics.authenticated?'telegram-api':'token-invalid-or-missing',
+    token_configured:diagnostics.tokenConfigured,
+    authenticated:diagnostics.authenticated,
+    bot:diagnostics.bot,
+    telegram_error:diagnostics.telegramError,
+    webhook:diagnostics.webhook,
+    webhook_url:`${PUBLIC_BASE_URL}/api/telegram-webhook`,
+    invite_url:BOT_INVITE_URL,
+    shop_url:PUBLIC_BASE_URL,
+    support_username:SUPPORT_USERNAME,
+    support_url:SUPPORT_URL,
+    payment_modes:['Bitcoin (BTC)','Solana (SOL)','BNB'],
+    invitation:`👋 Willkommen im Lyca Webshop!\n\n🛍️ Lyca Mobile Triple-SIM online bestellen.\n📦 Produkte · Warenkorb · Bestellung · Rechnung\n💳 Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB.\n\n🔗 ${BOT_INVITE_URL}`
+  });
+}
+
+async function telegramInvite(req,res) {
+  const diagnostics = await telegramDiagnostics();
+  sendJson(res, diagnostics.authenticated ? 200 : 503, {
+    ok:diagnostics.authenticated,
+    bot_username:telegram.username,
+    invite_url:BOT_INVITE_URL,
+    authenticated:diagnostics.authenticated,
+    description:BOT_DESCRIPTION,
+    short_description:BOT_SHORT_DESCRIPTION,
+    payment_modes:['Bitcoin (BTC)','Solana (SOL)','BNB'],
+    message:`👋 LYCA WEBSHOP\n\nWillkommen! 🛍️\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\n\n📱 Standard · Micro · Nano\n📦 Mengenpreise im Shop\n🧾 Bestellung & Rechnung\n💳 Zahlung: Bitcoin (BTC), Solana (SOL) und BNB\n❓ Support: @${SUPPORT_USERNAME}\n\n👉 Bot öffnen: ${BOT_INVITE_URL}`
+  });
 }
 
 async function setupTelegram() {
-  try { const result = await telegram.configure(PUBLIC_BASE_URL); console.log('Telegram setup:', result); }
-  catch (err) { console.error('Telegram setup failed:', err.message || err); }
+  try {
+    const result = await telegram.configure(PUBLIC_BASE_URL);
+    console.log('Telegram setup:', result);
+    if (result && result.enabled) {
+      const profile = await configureTelegramProfile();
+      console.log('Telegram profile setup:', {
+        description:profile.description?.ok === true,
+        shortDescription:profile.shortDescription?.ok === true,
+        commands:profile.commands?.ok === true
+      });
+    }
+    const diagnostics = await telegramDiagnostics();
+    console.log('Telegram diagnostics:', {
+      authenticated:diagnostics.authenticated,
+      botUsername:diagnostics.bot?.username || telegram.username,
+      webhookUrl:diagnostics.webhook?.url || ''
+    });
+  } catch (err) { console.error('Telegram setup failed:', err.message || err); }
 }
 
 const server = http.createServer(async (req,res) => {
   const route = (req.url || '').split('?')[0];
   if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
+  if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
 
