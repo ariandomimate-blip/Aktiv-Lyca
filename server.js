@@ -7,7 +7,6 @@ const telegram = require('./telegram-bot');
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
-const CANONICAL_HOST = 'aktiv-lyca.de';
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
 const mimeTypes = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.ico':'image/x-icon' };
@@ -53,9 +52,24 @@ async function telegramOrder(req, res) {
     };
     const result = await telegram.sendOrder(order);
     const invoiceText = formatInvoice(order);
-    const botUrl = `https://t.me/${telegram.username}?start=${encodeURIComponent(orderNumber)}`;
+    // Open the support user's private chat with the complete order/invoice prefilled.
+    // Telegram still requires the customer to press Send; the bot separately notifies configured administrators.
     const supportUrl = `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
-    sendJson(res, 201, {ok:true, order_number:orderNumber, invoice_number:invoiceNumber, payment_status:order.paymentStatus, bot_username:telegram.username, bot_mode:telegram.tokenConfigured ? 'telegram-api' : 'token-missing', admin_recipients:result.adminRecipients, bot_message:result.message, invoice:invoiceText, support_username:SUPPORT_USERNAME, support_url:supportUrl, telegram_url:botUrl, shop_url:PUBLIC_BASE_URL});
+    sendJson(res, 201, {
+      ok:true,
+      order_number:orderNumber,
+      invoice_number:invoiceNumber,
+      payment_status:order.paymentStatus,
+      bot_username:telegram.username,
+      bot_mode:telegram.tokenConfigured ? 'telegram-api' : 'token-missing',
+      admin_recipients:result.adminRecipients,
+      bot_message:result.message,
+      invoice:invoiceText,
+      support_username:SUPPORT_USERNAME,
+      support_url:supportUrl,
+      telegram_url:supportUrl,
+      shop_url:PUBLIC_BASE_URL
+    });
   } catch (err) {
     console.error('Lyca order error:', err);
     sendJson(res, 500, {error:err.message || 'Bestellung konnte nicht verarbeitet werden.'});
