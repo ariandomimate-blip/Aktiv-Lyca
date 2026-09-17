@@ -4,8 +4,7 @@ const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop_Bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
-const adminChatIds = String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '')
-  .split(',').map(x => x.trim()).filter(Boolean);
+const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 
 const wallets = {
@@ -52,14 +51,11 @@ function getOrder(id) { return orders.get(String(id || '').trim()) || null; }
 async function sendOrder(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
-  if (token && adminChatIds.length) {
-    for (const chatId of adminChatIds) {
-      try {
-        const result = await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
-        if (!result.ok) console.error(`Lyca Bot: admin delivery failed for ${chatId}: ${result.description || 'unknown error'}`);
-      } catch (err) {
-        console.error(`Lyca Bot: admin delivery exception for ${chatId}:`, err.message);
-      }
+  for (const chatId of adminChatIds) {
+    try {
+      await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
+    } catch (err) {
+      console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message);
     }
   }
   return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order) };
@@ -82,10 +78,20 @@ async function handleUpdate(update) {
   const text = String(msg.text || '').trim();
   const parts = text.split(/\s+/);
   const command = parts[0].split('@')[0];
+  const senderUsername = String(msg.from?.username || '').replace(/^@/, '');
+  const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase();
+
+  if (isSupportAdmin) {
+    adminChatIds.add(String(chatId));
+  }
 
   if (command === '/start') {
     const order = getOrder(parts[1]);
     sessions.set(String(chatId), { lastOrder: order?.orderNumber || null });
+    if (isSupportAdmin) {
+      await sendMessage(chatId, '🛠️ Lyca Support ist als Administrator verbunden.\n\nNeue Bestellungen werden ebenfalls an diesen Chat gesendet.\nDu kannst /paid BESTELLNUMMER oder /unpaid BESTELLNUMMER verwenden.', { reply_markup: makeKeyboard() });
+      return;
+    }
     if (order) {
       await sendMessage(chatId, `✅ Bestellung ${order.orderNumber} wurde gefunden.\n\n${invoiceText(order)}`, { reply_markup: makeKeyboard(order.orderNumber) });
     } else {
@@ -108,7 +114,7 @@ async function handleUpdate(update) {
     return;
   }
   if (command === '/paid' || command === '/unpaid') {
-    if (!adminChatIds.includes(String(chatId))) {
+    if (!adminChatIds.has(String(chatId))) {
       await sendMessage(chatId, 'Dieser Befehl ist nur für den Shop-Administrator verfügbar.');
       return;
     }
@@ -144,7 +150,7 @@ async function configure(baseUrl = publicBaseUrl) {
 
 module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
-  adminChatIds, sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
+  sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
   invoiceText, webhookSecret, supportUsername
 };
