@@ -24,4 +24,4 @@ function command(text){
   return 'Unbekannter Befehl. Nutze /help.';
 }
 
-module.exports={enabled:true,sendOrder,command,getOrder:id=>orders.get(id)||null,getOrders:()=>Array.from(orders.values()),getBalances,username:botUsername};
+module.exports={enabled:true,sendOrder,command,getOrder:id=>orders.get(id)||null,getOrders:()=>Array.from(orders.values()),getBalances,wallets,username:botUsername};
