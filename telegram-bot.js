@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop_Bot').replace(/^@/, '');
-const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
+const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_webshop1_bot').replace(/^@/, '');
+const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
@@ -19,7 +19,7 @@ const sessions = new Map();
 function formatMoney(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
 function formatOrder(order) {
   const lines = order.items.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.price)} / Stück`).join('\n');
-  return `🛒 LYCA WEBSHOP · BESTELLUNG\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnung: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n👤 KUNDE\n${order.customer.name}\n${order.customer.address}\n${order.customer.email}\n\n📦 BESTELLUNG\n${lines}\n\n💶 Gesamt: ${formatMoney(order.total)}\n💳 Zahlungsstatus: ${order.paymentStatus}\n\n📩 Support: @${supportUsername}`;
+  return `🛒 LYCA WEBSHOP · NEUE BESTELLUNG\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnung: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n👤 KUNDE\n${order.customer.name}\n${order.customer.address}\n${order.customer.email}\n\n📦 BESTELLUNG\n${lines}\n\n💶 Gesamt: ${formatMoney(order.total)}\n💳 Zahlungsstatus: ${order.paymentStatus}\n\n📩 Support: @${supportUsername}`;
 }
 
 function invoiceText(order) {
@@ -27,8 +27,8 @@ function invoiceText(order) {
 }
 
 function makeKeyboard(orderNumber) {
-  const rows = [[{ text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl || 'https://webshopsim1.onrender.com' } }]];
-  if (orderNumber) rows.push([{ text: '🧾 Bestellung', callback_data: `order:${orderNumber}` }]);
+  const rows = [[{ text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl } }]];
+  if (orderNumber) rows.push([{ text: '🧾 Bestellung / Rechnung', callback_data: `order:${orderNumber}` }]);
   rows.push([{ text: '💬 Support', url: `https://t.me/${supportUsername}` }]);
   return { inline_keyboard: rows };
 }
@@ -51,14 +51,16 @@ function getOrder(id) { return orders.get(String(id || '').trim()) || null; }
 async function sendOrder(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
-  for (const chatId of adminChatIds) {
+  const recipients = Array.from(adminChatIds);
+  for (const chatId of recipients) {
     try {
-      await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
+      const result = await sendMessage(chatId, formatOrder(order), { reply_markup: makeKeyboard(order.orderNumber) });
+      if (!result.ok) console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
     } catch (err) {
       console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message);
     }
   }
-  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order) };
+  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length };
 }
 
 async function handleUpdate(update) {
@@ -81,21 +83,19 @@ async function handleUpdate(update) {
   const senderUsername = String(msg.from?.username || '').replace(/^@/, '');
   const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase();
 
-  if (isSupportAdmin) {
-    adminChatIds.add(String(chatId));
-  }
+  if (isSupportAdmin) adminChatIds.add(String(chatId));
 
   if (command === '/start') {
     const order = getOrder(parts[1]);
     sessions.set(String(chatId), { lastOrder: order?.orderNumber || null });
     if (isSupportAdmin) {
-      await sendMessage(chatId, '🛠️ Lyca Support ist als Administrator verbunden.\n\nNeue Bestellungen werden ebenfalls an diesen Chat gesendet.\nDu kannst /paid BESTELLNUMMER oder /unpaid BESTELLNUMMER verwenden.', { reply_markup: makeKeyboard() });
+      await sendMessage(chatId, '🛠️ Lyca Support ist als Administrator verbunden.\n\nNeue Bestellungen werden an die konfigurierten Administratoren gesendet.\nDu kannst /paid BESTELLNUMMER oder /unpaid BESTELLNUMMER verwenden.', { reply_markup: makeKeyboard() });
       return;
     }
     if (order) {
       await sendMessage(chatId, `✅ Bestellung ${order.orderNumber} wurde gefunden.\n\n${invoiceText(order)}`, { reply_markup: makeKeyboard(order.orderNumber) });
     } else {
-      await sendMessage(chatId, `🤖 Willkommen beim Lyca Webshop.\n\n🛍️ Öffne den Shop über den Button.\n🧾 Nach dem Checkout erhältst du hier deine Bestellbestätigung und Rechnung.`, { reply_markup: makeKeyboard() });
+      await sendMessage(chatId, `🤖 Willkommen beim Lyca Webshop!\n\n🛍️ Über den Button unten öffnest du den Shop.\n🧾 Nach dem Checkout erhältst du hier deine private Bestellbestätigung und Rechnung.`, { reply_markup: makeKeyboard() });
     }
     return;
   }
@@ -105,12 +105,12 @@ async function handleUpdate(update) {
   }
   if (command === '/order') {
     const order = getOrder(parts[1]);
-    await sendMessage(chatId, order ? formatOrder(order) : 'Bestellung nicht gefunden.');
+    await sendMessage(chatId, order ? formatOrder(order) : 'Bestellung nicht gefunden.', { reply_markup: order ? makeKeyboard(order.orderNumber) : makeKeyboard() });
     return;
   }
   if (command === '/invoice') {
     const order = getOrder(parts[1] || sessions.get(String(chatId))?.lastOrder);
-    await sendMessage(chatId, order ? invoiceText(order) : 'Keine Bestellung gefunden.');
+    await sendMessage(chatId, order ? invoiceText(order) : 'Keine Bestellung gefunden.', { reply_markup: order ? makeKeyboard(order.orderNumber) : makeKeyboard() });
     return;
   }
   if (command === '/paid' || command === '/unpaid') {
@@ -121,10 +121,10 @@ async function handleUpdate(update) {
     const order = getOrder(parts[1]);
     if (!order) { await sendMessage(chatId, 'Bestellung nicht gefunden.'); return; }
     order.paymentStatus = command === '/paid' ? 'BEZAHLT' : 'UNBEZAHLT';
-    await sendMessage(chatId, `✅ ${order.orderNumber}: ${order.paymentStatus}`);
+    await sendMessage(chatId, `✅ ${order.orderNumber}: ${order.paymentStatus}`, { reply_markup: makeKeyboard(order.orderNumber) });
     return;
   }
-  await sendMessage(chatId, 'Nutze /shop, /order BESTELLNUMMER oder /invoice BESTELLNUMMER.');
+  await sendMessage(chatId, 'Nutze /shop, /order BESTELLNUMMER oder /invoice BESTELLNUMMER.', { reply_markup: makeKeyboard() });
 }
 
 async function configure(baseUrl = publicBaseUrl) {
