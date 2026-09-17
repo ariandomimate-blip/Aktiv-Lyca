@@ -2,6 +2,17 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+
+// Normalize the Telegram token before telegram-bot.js is loaded.
+// This protects against accidental whitespace, quotes, or a copied KEY=value wrapper.
+function normalizeTelegramToken(value) {
+  let token = String(value || '').trim();
+  token = token.replace(/^TELEGRAM_BOT_TOKEN\s*=\s*/i, '').trim();
+  token = token.replace(/^['"]|['"]$/g, '').trim();
+  return token;
+}
+process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
+
 const telegram = require('./telegram-bot');
 
 const port = Number(process.env.PORT) || 10000;
@@ -52,8 +63,6 @@ async function telegramOrder(req, res) {
     };
     const result = await telegram.sendOrder(order);
     const invoiceText = formatInvoice(order);
-    // Telegram opens the support chat with the complete order/invoice prefilled.
-    // The customer still has to press Send because Telegram does not let a website send as the user.
     const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
     sendJson(res, 201, {
       ok:true,
