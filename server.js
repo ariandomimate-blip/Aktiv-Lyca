@@ -127,7 +127,8 @@ async function telegramDiagnostics() {
     ok: Boolean(me.ok),
     tokenConfigured:true,
     authenticated:Boolean(me.ok),
-    bot: me.ok && me.result ? { id:me.result.id, username:me.result.username, firstName:me.result.first_name, isBot:me.result.is_bot } : null,
+    can_connect_to_business: Boolean(me.ok && me.result?.can_connect_to_business),
+    bot: me.ok && me.result ? { id:me.result.id, username:me.result.username, firstName:me.result.first_name, isBot:me.result.is_bot, canConnectToBusiness:Boolean(me.result.can_connect_to_business), hasMainWebApp:Boolean(me.result.has_main_web_app) } : null,
     expected_bot_username: telegram.username,
     telegramError: me.ok ? null : (me.description || 'Unauthorized'),
     webhook: webhook.ok ? {
@@ -239,6 +240,7 @@ async function setupTelegram() {
     const diagnostics = await telegramDiagnostics();
     console.log('Telegram diagnostics:', {
       authenticated:diagnostics.authenticated,
+      canConnectToBusiness:diagnostics.can_connect_to_business,
       botUsername:diagnostics.bot?.username || telegram.username,
       webhookUrl:diagnostics.webhook?.url || ''
     });
@@ -249,6 +251,7 @@ const server = http.createServer(async (req,res) => {
   const route = (req.url || '').split('?')[0];
   if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
+  if (req.method === 'GET' && route === '/api/telegram-business-status') return sendJson(res,200,{ ok:true, bot_username:telegram.username, business_ready:Boolean((await telegramDiagnostics()).can_connect_to_business), connections:telegram.getBusinessStatus().connections });
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
   if (req.method === 'POST' && route === '/api/chat') {
