@@ -90,6 +90,52 @@ async function api(method, body = {}) {
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
 async function sendMessage(chatId, text, extra = {}) { return api('sendMessage', { chat_id: chatId, text, ...extra }); }
+
+const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
+const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
+const aiEnabled = String(process.env.AI_ENABLED || 'true').toLowerCase() !== 'false';
+const aiSessions = new Map();
+
+function getAiHistory(chatId) {
+  const key = String(chatId);
+  if (!aiSessions.has(key)) aiSessions.set(key, []);
+  return aiSessions.get(key);
+}
+
+async function openaiReply(chatId, userText) {
+  if (!aiEnabled || !openaiApiKey) return null;
+  const history = getAiHistory(chatId);
+  history.push({ role: 'user', content: String(userText || '').slice(0, 8000) });
+  const recent = history.slice(-12);
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: openaiModel,
+        instructions: 'Du bist der KI-Assistent des Lyca Webshops. Antworte auf Deutsch, freundlich und präzise. Hilf bei Shop, Produkten, Bestellung, Rechnung und allgemeinem Support. Erfinde keine Bestell-, Zahlungs- oder Kontodaten. Wenn eine konkrete Bestellung benötigt wird, verlange die Bestellnummer. Du bist ein Support-Assistent und behauptest nicht, ein menschlicher Mitarbeiter zu sein.',
+        input: recent,
+        max_output_tokens: 700
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('OpenAI API error:', data?.error?.message || `HTTP ${response.status}`);
+      return null;
+    }
+    const answer = String(data.output_text || '').trim();
+    if (!answer) return null;
+    history.push({ role: 'assistant', content: answer });
+    if (history.length > 20) history.splice(0, history.length - 20);
+    return answer;
+  } catch (err) {
+    console.error('OpenAI request failed:', err.message || err);
+    return null;
+  }
+}
 async function sendBusinessMessage(connectionId, chatId, text, extra = {}) { return api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra }); }
 async function editMessage(chatId, messageId, text, replyMarkup) { return api('editMessageText', { chat_id: chatId, message_id: messageId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }); }
 
@@ -268,6 +314,7 @@ async function handleUpdate(update) {
     return showHome(chatId);
   }
   if (command === '/myid') return sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`, { reply_markup: mainKeyboard() });
+  if (command === '/ai') { const prompt = parts.slice(1).join(' ').trim(); if (!prompt) return sendMessage(chatId, '🤖 Schreibe z. B. /ai Wie kann ich bestellen?', { reply_markup: mainKeyboard() }); const ai = await openaiReply(chatId, prompt); return sendMessage(chatId, ai || '⚠️ KI ist momentan nicht konfiguriert. Bitte versuche es später erneut.', { reply_markup: mainKeyboard() }); }
   if (command === '/shop') return showProducts(chatId);
   if (command === '/support') return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
   if (command === '/order') {
@@ -291,7 +338,7 @@ async function handleUpdate(update) {
   if (/produkte|produkt|sim/i.test(text)) return showProducts(chatId);
   if (/bestellung|order/i.test(text)) return showOrders(chatId);
   if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
-  return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
+  const ai = await openaiReply(chatId, text);\n  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });\n  return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
 }
 
 async function configure(baseUrl = publicBaseUrl) {
@@ -311,7 +358,7 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'order', description: 'Bestellung anzeigen' },
     { command: 'invoice', description: 'Rechnung anzeigen' },
     { command: 'support', description: 'Support kontaktieren' },
-    { command: 'myid', description: 'Telegram Chat-ID anzeigen' }
+    { command: 'myid', description: 'Telegram Chat-ID anzeigen' },\n    { command: 'ai', description: 'KI-Assistent fragen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
   return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: true, miniAppUrl: baseUrl };
