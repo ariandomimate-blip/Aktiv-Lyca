@@ -67,7 +67,7 @@ const BOT_COMMANDS = [
   { command:'shop', description:'Webshop öffnen' },
   { command:'support', description:'Support kontaktieren' },
   { command:'payment', description:'Zahlungsarten anzeigen' },
-  { command:'cancel', description:'Vorgang abbrechen' }
+  { command:'cancel', description:'Vorgang abbrechen' },\n  { command:'ai', description:'KI-Assistent fragen' }
 ];
 
 async function configureTelegramProfile() {
