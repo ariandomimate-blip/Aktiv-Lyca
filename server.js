@@ -26,6 +26,7 @@ const telegram = require('./telegram-bot');
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
+const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
 const BOT_INVITE_URL = `https://t.me/${telegram.username}`;
@@ -138,6 +139,8 @@ async function telegramDiagnostics() {
     can_connect_to_business: Boolean(me.ok && me.result?.can_connect_to_business),
     bot: me.ok && me.result ? { id:me.result.id, username:me.result.username, firstName:me.result.first_name, isBot:me.result.is_bot, canConnectToBusiness:Boolean(me.result.can_connect_to_business), hasMainWebApp:Boolean(me.result.has_main_web_app) } : null,
     expected_bot_username: telegram.username,
+    expected_bot_id: TELEGRAM_BOT_ID || null,
+    bot_id_matches_expected: Boolean(me.ok && TELEGRAM_BOT_ID && String(me.result?.id) === TELEGRAM_BOT_ID),
     telegramError: me.ok ? null : (me.description || 'Unauthorized'),
     webhook: webhook.ok ? {
       url:webhook.result.url || '',
