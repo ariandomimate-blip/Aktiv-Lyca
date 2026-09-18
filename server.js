@@ -9,6 +9,14 @@ function normalizeTelegramToken(value) {
   let token = String(value || '').trim();
   token = token.replace(/^TELEGRAM_BOT_TOKEN\s*=\s*/i, '').trim();
   token = token.replace(/^['"]|['"]$/g, '').trim();
+
+  // Accept common accidental copy/paste forms from BotFather/browser:
+  // raw token, "bot<token>", or the full Bot API URL.
+  const urlMatch = token.match(/api\.telegram\.org\/bot([^/?#\s]+)(?:\/[^\s]*)?/i);
+  if (urlMatch) token = urlMatch[1].trim();
+  token = token.replace(/^bot(?=\d+:)/i, '').trim();
+  token = token.split(/[?#]/, 1)[0].replace(/\/getMe$/i, '').replace(/\/$/, '').trim();
+
   return token;
 }
 process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
