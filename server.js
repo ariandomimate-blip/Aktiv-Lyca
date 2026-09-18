@@ -57,6 +57,44 @@ async function telegramApi(method, body = {}) {
   }
 }
 
+const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
+const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
+const webAiSessions = new Map();
+
+async function webAiReply(sessionId, userText) {
+  if (!openaiApiKey) return { ok:false, error:'KI ist derzeit nicht konfiguriert.' };
+  const id = String(sessionId || 'web').slice(0,120);
+  if (!webAiSessions.has(id)) webAiSessions.set(id, []);
+  const history = webAiSessions.get(id);
+  history.push({ role:'user', content:String(userText || '').slice(0,8000) });
+  const input = history.slice(-12);
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method:'POST',
+      headers:{'content-type':'application/json','authorization':`Bearer ${openaiApiKey}`},
+      body:JSON.stringify({
+        model:openaiModel,
+        instructions:'Du bist der KI-Assistent des Lyca Webshops. Antworte auf Deutsch, freundlich und präzise. Hilf bei Produkten, Bestellung, Rechnung, Warenkorb und allgemeinem Support. Erfinde keine Bestell-, Zahlungs- oder Kontodaten. Für konkrete Bestellungen benötigst du die Bestellnummer. Verweise bei menschlichem Support auf @Lyca_Support.',
+        input,
+        max_output_tokens:700
+      })
+    });
+    const data=await response.json();
+    if (!response.ok) {
+      console.error('Web AI error:', data?.error?.message || `HTTP ${response.status}`);
+      return {ok:false,error:'Der KI-Assistent ist momentan nicht erreichbar.'};
+    }
+    const answer=String(data.output_text || '').trim();
+    if (!answer) return {ok:false,error:'Keine KI-Antwort erhalten.'};
+    history.push({role:'assistant',content:answer});
+    if (history.length>20) history.splice(0,history.length-20);
+    return {ok:true,answer};
+  } catch(err) {
+    console.error('Web AI request failed:',err.message || err);
+    return {ok:false,error:'Der KI-Assistent ist momentan nicht erreichbar.'};
+  }
+}
+
 const BOT_DESCRIPTION = 'Willkommen im Lyca Webshop! 🛍️ Lyca Mobile Triple-SIM bequem online bestellen. Warenkorb, Bestellung und Rechnung direkt über Telegram. Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB – je nach freigeschalteter Zahlungsoption. Support: @' + SUPPORT_USERNAME;
 const BOT_SHORT_DESCRIPTION = 'Lyca Webshop 🛍️ Triple-SIM · Bestellung · Rechnung · BTC · SOL · BNB';
 const BOT_COMMANDS = [
@@ -213,6 +251,10 @@ const server = http.createServer(async (req,res) => {
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
+  if (req.method === 'POST' && route === '/api/chat') {
+    try { const data=await parseJson(req); const message=String(data.message || '').trim(); if(!message) return sendJson(res,400,{ok:false,error:'Bitte eine Nachricht eingeben.'}); const result=await webAiReply(data.session_id,message); return sendJson(res,result.ok?200:503,result); }
+    catch(err){ return sendJson(res,400,{ok:false,error:err.message || 'Chat-Anfrage ungültig.'}); }
+  }
 
   let filePath;
   try { filePath = safePath(req.url || '/'); } catch { res.writeHead(400); return res.end('Bad Request'); }
