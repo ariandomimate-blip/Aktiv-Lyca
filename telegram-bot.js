@@ -338,7 +338,8 @@ async function handleUpdate(update) {
   if (/produkte|produkt|sim/i.test(text)) return showProducts(chatId);
   if (/bestellung|order/i.test(text)) return showOrders(chatId);
   if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
-  const ai = await openaiReply(chatId, text);\n  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });
+  const ai = await openaiReply(chatId, text);
+  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });
   return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
 }
 
