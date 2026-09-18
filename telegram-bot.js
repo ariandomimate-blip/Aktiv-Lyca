@@ -16,6 +16,7 @@ const wallets = {
 const orders = new Map();
 const sessions = new Map();
 const businessConnections = new Map();
+const businessConnectionUsers = new Map();
 
 const products = {
   lyca: {
@@ -216,7 +217,8 @@ async function handleBusinessConnection(connection) {
   const id = String(connection.id || '');
   if (!id) return;
   businessConnections.set(id, connection);
-  console.log(`Lyca Business connection ${connection.is_enabled ? 'enabled' : 'disabled'} for ${connection.user?.username || connection.user?.id || 'unknown user'} (${id})`);
+  if (connection.user?.id != null) businessConnectionUsers.set(String(connection.user.id), id);
+  console.log(`Lyca Business connection ${connection.is_enabled ? 'enabled' : 'disabled'} for ${connection.user?.username || connection.user?.id || 'unknown user'} (${id}) rights=${JSON.stringify(connection.rights || {})}`);
 }
 async function getBusinessConnection(connectionId) {
   const id = String(connectionId || '');
@@ -232,12 +234,23 @@ async function handleBusinessMessage(msg) {
   if (!connectionId || !msg.chat) return;
   const connection = await getBusinessConnection(connectionId);
   if (connection && connection.is_enabled === false) return;
-  if (connection?.rights?.can_reply === false) return;
-  const text = String(msg.text || '').trim();
+  if (connection?.rights?.can_reply === false) {
+    console.warn(`Lyca Business message received but can_reply=false for ${connectionId}`);
+    return;
+  }
+  const text = String(msg.text || msg.caption || '').trim();
   if (!text) return;
-  const result = await sendBusinessMessage(connectionId, msg.chat.id, businessReplyText(text), { reply_markup: mainKeyboard() });
+  let reply = businessReplyText(text);
+  if (!/LYCA-\d{8}-[A-F0-9]{6}/i.test(text) && !/rechnung|invoice|bestellung|order|preis|kosten|sim|shop|kaufen|produkt/i.test(text)) {
+    const ai = await openaiReply(`business:${connectionId}:${msg.chat.id}`, text);
+    if (ai) reply = `🤖 ${ai}`;
+  }
+  const result = await sendBusinessMessage(connectionId, msg.chat.id, reply, { reply_markup: mainKeyboard() });
   if (!result.ok) console.error(`Lyca Business reply failed: ${result.description || 'unknown Telegram error'}`);
-  if (connection?.rights?.can_read_messages) await api('readBusinessMessage', { business_connection_id: connectionId, chat_id: msg.chat.id, message_id: msg.message_id });
+  if (connection?.rights?.can_read_messages) {
+    const read = await api('readBusinessMessage', { business_connection_id: connectionId, chat_id: msg.chat.id, message_id: msg.message_id });
+    if (!read.ok) console.warn(`Lyca Business read failed: ${read.description || 'unknown Telegram error'}`);
+  }
 }
 
 async function showHome(chatId, messageId = null) {
@@ -377,12 +390,20 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'ai', description: 'KI-Assistent fragen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
-  return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: true, miniAppUrl: baseUrl };
+  return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: Boolean(me.result?.can_connect_to_business), canConnectToBusiness: Boolean(me.result?.can_connect_to_business), miniAppUrl: baseUrl };
 }
 
 module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
   sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
-  invoiceText, webhookSecret, supportUsername, supportChatId, botOrderUrl, supportUrl
+  invoiceText, webhookSecret, supportUsername, supportChatId, botOrderUrl, supportUrl,
+  getBusinessStatus: () => ({
+    connections: Array.from(businessConnections.values()).map(c => ({
+      id: c.id,
+      user: c.user ? { id: c.user.id, username: c.user.username || '', firstName: c.user.first_name || '' } : null,
+      is_enabled: c.is_enabled,
+      rights: c.rights || {}
+    }))
+  })
 };
