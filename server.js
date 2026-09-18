@@ -114,6 +114,7 @@ async function telegramOrder(req, res) {
       orderNumber, invoiceNumber,
       createdAt:new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'}),
       customer:{name:String(customer.name).trim(), email:String(customer.email).trim(), address:String(customer.address).trim()},
+      telegramChatId:String(data.telegram_chat_id || '').trim(),
       items:normalizedItems, total, paymentStatus:'UNBEZAHLT'
     };
     const result = await telegram.sendOrder(order);
