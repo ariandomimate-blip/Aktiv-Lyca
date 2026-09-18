@@ -338,7 +338,8 @@ async function handleUpdate(update) {
   if (/produkte|produkt|sim/i.test(text)) return showProducts(chatId);
   if (/bestellung|order/i.test(text)) return showOrders(chatId);
   if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
-  const ai = await openaiReply(chatId, text);\n  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });\n  return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
+  const ai = await openaiReply(chatId, text);\n  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });
+  return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
 }
 
 async function configure(baseUrl = publicBaseUrl) {
@@ -358,7 +359,8 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'order', description: 'Bestellung anzeigen' },
     { command: 'invoice', description: 'Rechnung anzeigen' },
     { command: 'support', description: 'Support kontaktieren' },
-    { command: 'myid', description: 'Telegram Chat-ID anzeigen' },\n    { command: 'ai', description: 'KI-Assistent fragen' }
+    { command: 'myid', description: 'Telegram Chat-ID anzeigen' },
+    { command: 'ai', description: 'KI-Assistent fragen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
   return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: true, miniAppUrl: baseUrl };
