@@ -1,5 +1,5 @@
 const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_webshop1_bot').replace(/^@/, '');
+let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_webshop2_bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
@@ -356,6 +356,7 @@ async function configure(baseUrl = publicBaseUrl) {
   if (!token) return { enabled: false, reason: 'TELEGRAM_BOT_TOKEN fehlt' };
   const me = await api('getMe');
   if (!me.ok) return { enabled: false, reason: me.description || 'Telegram token rejected' };
+  if (me.result?.username) botUsername = String(me.result.username).replace(/^@/, '');
   if (baseUrl) {
     const webhookUrl = `${baseUrl}/api/telegram-webhook`;
     const body = { url: webhookUrl, allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'], drop_pending_updates: false };
