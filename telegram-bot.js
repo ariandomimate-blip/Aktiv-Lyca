@@ -46,7 +46,8 @@ function callback(text, data) { return { text, callback_data: data }; }
 function mainKeyboard() {
   return { inline_keyboard: [
     [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
-    [callback('📋 Bestellung', 'orders'), webAppButton()],
+    [callback('📋 Bestellung', 'orders'), callback('🤖 KI-Assistent', 'ai')],
+    [webAppButton()],
     [urlButton('❓ Support', `https://t.me/${supportUsername}`)]
   ] };
 }
@@ -189,7 +190,8 @@ async function sendOrder(order) {
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     try {
-      const result = await sendMessage(customerChatId, invoiceText(order), { reply_markup: orderKeyboard(order) });
+      const customerMessage = `✅ BESTELLUNG ERFOLGREICH ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n${invoiceText(order)}\n\n📌 Zahlungsstatus: ${order.paymentStatus}\n\nDeine Bestellung und Rechnung sind jetzt direkt in Telegram verfügbar.`;
+      const result = await sendMessage(customerChatId, customerMessage, { reply_markup: orderKeyboard(order) });
       customerNotified = Boolean(result.ok);
       if (!result.ok) console.error(`Lyca Bot: failed to send customer confirmation: ${result.description || 'unknown Telegram error'}`);
     } catch (err) { console.error('Lyca Bot: customer confirmation failed', err.message); }
@@ -239,7 +241,7 @@ async function handleBusinessMessage(msg) {
 }
 
 async function showHome(chatId, messageId = null) {
-  const text = '👋 WILLKOMMEN IM LYCA WEBSHOP\n\n🛍️ Hier kannst du Produkte ansehen, deinen Warenkorb verwalten und deine Bestellung aufrufen.\n\nWähle eine Funktion:';
+  const text = '👋 WILLKOMMEN BEIM LYCA WEBSHOP 2\n\n📱 Lyca Mobile Triple-SIM\n🛍️ Produkte direkt ansehen und bestellen\n🛒 Warenkorb verwalten\n🧾 Bestellnummer & Rechnung erhalten\n🤖 KI-Support für Fragen\n💬 Persönlicher Support: @' + supportUsername + '\n\nWähle unten eine Funktion:';
   if (messageId) return editMessage(chatId, messageId, text, mainKeyboard());
   return sendMessage(chatId, text, { reply_markup: mainKeyboard() });
 }
@@ -277,6 +279,7 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
+  if (data === 'ai') return sendMessage(chatId, '🤖 KI-ASSISTENT\n\nSchreibe deine Frage direkt hier in den Chat oder nutze /ai gefolgt von deiner Frage.\n\nBeispiele:\n• Wie bestelle ich?\n• Wo ist meine Rechnung?\n• Wie funktioniert der Warenkorb?', { reply_markup: mainKeyboard() });
   if (data === 'checkout') {
     if (!cartItems(chatId).length) return showCart(chatId, messageId);
     return editMessage(chatId, messageId, checkoutText(chatId), { inline_keyboard: [[webAppButton()], [callback('🛒 Warenkorb', 'cart'), callback('↩️ Start', 'home')]] });
