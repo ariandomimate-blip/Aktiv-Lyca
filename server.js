@@ -251,7 +251,44 @@ const server = http.createServer(async (req,res) => {
   const route = (req.url || '').split('?')[0];
   if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
-  if (req.method === 'GET' && route === '/api/telegram-business-status') return sendJson(res,200,{ ok:true, bot_username:telegram.username, business_ready:Boolean((await telegramDiagnostics()).can_connect_to_business), connections:telegram.getBusinessStatus().connections });
+  if (req.method === 'GET' && route === '/api/telegram-business-status') {
+    const diagnostics = await telegramDiagnostics();
+    const ready = Boolean(diagnostics.can_connect_to_business);
+    return sendJson(res,200,{
+      ok:true,
+      bot_username:telegram.username,
+      business_ready:ready,
+      can_connect_to_business:ready,
+      authenticated:diagnostics.authenticated,
+      telegram_error:diagnostics.telegramError,
+      webhook:diagnostics.webhook,
+      connections:telegram.getBusinessStatus().connections,
+      next_step: !diagnostics.authenticated
+        ? 'Render sieht den Bot-Token nicht als gültig. In Render die TELEGRAM_BOT_TOKEN-Variable des Dienstes prüfen.'
+        : !ready
+          ? 'Telegram meldet can_connect_to_business=false. Secretary Mode in @BotFather muss für diesen Bot aktiv sein; danach Telegram neu öffnen und erneut prüfen.'
+          : 'Der Bot ist Business-fähig. Jetzt @Lyca_Support öffnen und den Bot verbinden.'
+    });
+  }
+  if (req.method === 'GET' && route === '/telegram-business-check') {
+    const diagnostics = await telegramDiagnostics();
+    const ready = Boolean(diagnostics.can_connect_to_business);
+    const status = !diagnostics.authenticated ? 'TOKEN / AUTH FEHLER' : ready ? 'SECRETARY MODE BEREIT' : 'SECRETARY MODE NOCH NICHT FREIGESCHALTET';
+    const detail = !diagnostics.authenticated
+      ? 'Der Server kann den Bot aktuell nicht bei Telegram authentifizieren.'
+      : ready
+        ? 'Telegram bestätigt can_connect_to_business=true.'
+        : 'Telegram bestätigt can_connect_to_business=false. Das ist eine Telegram-Bot-Konfiguration, nicht ein Webhook- oder JavaScript-Problem.';
+    const html = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Lyca Telegram Business Check</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff;max-width:720px;margin:40px auto;padding:20px} .card{padding:24px;border:1px solid #333;border-radius:18px;background:#1b1b1b} .ok{color:#7ee787}.bad{color:#ff7b72}.muted{color:#aaa} code{background:#222;padding:3px 6px;border-radius:6px}</style>' +
+      '<div class="card"><h1>🤖 Lyca Telegram Business</h1><h2 class="' + (ready ? 'ok' : 'bad') + '">' + status + '</h2><p>' + detail + '</p>' +
+      '<p>Bot: <code>@' + String(telegram.username).replace(/</g,'&lt;') + '</code></p>' +
+      '<p>Authentifiziert: <b>' + String(diagnostics.authenticated) + '</b><br>can_connect_to_business: <b>' + String(ready) + '</b></p>' +
+      '<p class="muted">Nach einer Änderung in @BotFather Telegram vollständig schließen/neu öffnen und diese Seite erneut laden.</p>' +
+      '<p><a href="https://t.me/Lyca_webshop2_bot" style="color:#6cb6ff">@Lyca_webshop2_bot öffnen</a> · <a href="https://t.me/BotFather" style="color:#6cb6ff">@BotFather öffnen</a></p></div>';
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+    return res.end(html);
+  }
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
   if (req.method === 'POST' && route === '/api/chat') {
