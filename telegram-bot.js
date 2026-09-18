@@ -178,14 +178,23 @@ async function sendOrder(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
   const recipients = Array.from(adminChatIds);
-  if (!recipients.length) console.error('Lyca Bot: no admin recipients configured');
+  if (!recipients.length) console.error('Lyca Bot: no admin recipients configured — Lyca_Support must send /start first or TELEGRAM_SUPPORT_CHAT_ID must be set.');
   for (const chatId of recipients) {
     try {
       const result = await sendMessage(chatId, formatOrder(order), { reply_markup: orderKeyboard(order) });
       if (!result.ok) console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
     } catch (err) { console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message); }
   }
-  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length, invoiceUrl: botOrderUrl(order.orderNumber), supportUrl: supportUrl(order) };
+  let customerNotified = false;
+  const customerChatId = String(order.telegramChatId || '').trim();
+  if (customerChatId) {
+    try {
+      const result = await sendMessage(customerChatId, invoiceText(order), { reply_markup: orderKeyboard(order) });
+      customerNotified = Boolean(result.ok);
+      if (!result.ok) console.error(`Lyca Bot: failed to send customer confirmation: ${result.description || 'unknown Telegram error'}`);
+    } catch (err) { console.error('Lyca Bot: customer confirmation failed', err.message); }
+  }
+  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length, customerNotified, invoiceUrl: botOrderUrl(order.orderNumber), supportUrl: supportUrl(order) };
 }
 
 function businessReplyText(text) {
