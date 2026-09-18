@@ -90,6 +90,7 @@ async function telegramDiagnostics() {
     tokenConfigured:true,
     authenticated:Boolean(me.ok),
     bot: me.ok && me.result ? { id:me.result.id, username:me.result.username, firstName:me.result.first_name, isBot:me.result.is_bot } : null,
+    expected_bot_username: telegram.username,
     telegramError: me.ok ? null : (me.description || 'Unauthorized'),
     webhook: webhook.ok ? {
       url:webhook.result.url || '',
