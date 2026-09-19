@@ -22,6 +22,7 @@ const orders = new Map();
 const sessions = new Map();
 const businessConnections = new Map();
 const businessConnectionUsers = new Map();
+const cryptoPayments = new Map();
 
 const products = {
   lyca: {
@@ -31,6 +32,55 @@ const products = {
     prices: { 10: 7, 50: 5, 100: 4.5, 200: 4, 250: 3.8, 500: 3.5 }
   }
 };
+
+
+async function getCryptoPriceEur(coin) {
+  const symbol = { BTC:'BTC', SOL:'SOL', BNB:'BNB' }[coin];
+  if (!symbol) throw new Error('Unbekannte Kryptowährung');
+  const urls = [
+    `https://data-api.binance.vision/api/v3/ticker/price?symbol=${symbol}EUR`,
+    `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}EUR`
+  ];
+  for (const url of urls) {
+    try {
+      const r = await fetch(url);
+      const data = await r.json();
+      const price = Number(data?.price);
+      if (r.ok && Number.isFinite(price) && price > 0) return price;
+    } catch {}
+  }
+  throw new Error('Krypto-Kurs konnte nicht abgerufen werden.');
+}
+function cryptoDecimals(coin) { return coin === 'SOL' ? 9 : 8; }
+async function createCryptoPayment(chatId, coin) {
+  const session = getSession(chatId);
+  const order = session.lastOrder ? getOrder(session.lastOrder) : null;
+  if (!order) return { ok:false, description:'Keine Bestellung im Chat ausgewählt. Öffne zuerst deine Bestellung.' };
+  if (order.paymentStatus === 'BEZAHLT') return { ok:false, description:'Diese Bestellung ist bereits bezahlt.' };
+  const priceEur = await getCryptoPriceEur(coin);
+  const decimals = cryptoDecimals(coin);
+  const amount = Number((order.total / priceEur).toFixed(decimals));
+  if (!(amount > 0)) return { ok:false, description:'Zahlungsbetrag konnte nicht berechnet werden.' };
+  const intent = { orderNumber:order.orderNumber, chatId:String(chatId), coin, wallet:wallets[coin], eurTotal:Number(order.total), cryptoAmount:amount, priceEur, createdAt:Date.now(), status:'UNBEZAHLT' };
+  cryptoPayments.set(order.orderNumber, intent);
+  return { ok:true, intent };
+}
+function getPendingCryptoPayments() { return Array.from(cryptoPayments.values()).filter(p => p.status === 'UNBEZAHLT'); }
+async function markOrderPaid(orderNumber, payment) {
+  const order = getOrder(orderNumber);
+  if (!order || order.paymentStatus === 'BEZAHLT') return false;
+  order.paymentStatus = 'BEZAHLT';
+  order.paymentMethod = payment.coin;
+  order.paymentTxId = payment.txid;
+  order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  const intent = cryptoPayments.get(orderNumber);
+  if (intent) { intent.status='BEZAHLT'; intent.txid=payment.txid; intent.detectedAt=Date.now(); }
+  const msg = `✅ ZAHLUNG BEZAHLT\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n📅 Bezahlt: ${order.paidAt}\\n\\n${invoiceText(order)}`;
+  const customerChatId = String(order.telegramChatId || intent?.chatId || '').trim();
+  if (customerChatId) await sendMessage(customerChatId, msg, { reply_markup: orderKeyboard(order) });
+  for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: orderKeyboard(order) });
+  return true;
+}
 
 function formatMoney(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
 function formatOrder(order) {
@@ -329,7 +379,18 @@ async function handleCallback(q) {
     if (!cartItems(chatId).length) return showCart(chatId, messageId);
     return editMessage(chatId, messageId, checkoutText(chatId), cryptoPaymentKeyboard());
   }
-  if (data === 'pay:btc') return sendMessage(chatId, '₿ BITCOIN-ZAHLUNG\\n\\nSende die Zahlung an diese Bitcoin-Adresse:\\n\\n' + wallets.BTC + '\\n\\n⚠️ Nur Bitcoin-Netzwerk verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
+  if (data === 'pay:btc' || data === 'pay:sol' || data === 'pay:bnb') {
+    const coin = data === 'pay:btc' ? 'BTC' : data === 'pay:sol' ? 'SOL' : 'BNB';
+    try {
+      const result = await createCryptoPayment(chatId, coin);
+      if (!result.ok) return sendMessage(chatId, '⚠️ ' + result.description, { reply_markup: cryptoPaymentKeyboard() });
+      const p = result.intent;
+      return sendMessage(chatId, `💳 ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Nach bestätigtem Eingang wird die Bestellung automatisch auf BEZAHLT gesetzt und die Rechnung erneut mit Zahlungsstatus BEZAHLT gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
+    } catch (err) {
+      return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
+    }
+  }
+\\n\\nSende die Zahlung an diese Bitcoin-Adresse:\\n\\n' + wallets.BTC + '\\n\\n⚠️ Nur Bitcoin-Netzwerk verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
   if (data === 'pay:sol') return sendMessage(chatId, '◎ SOLANA-ZAHLUNG\\n\\nSende die Zahlung an diese Solana-Adresse:\\n\\n' + wallets.SOL + '\\n\\n⚠️ Nur Solana-Netzwerk verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
   if (data === 'pay:bnb') return sendMessage(chatId, '◈ BNB SMART CHAIN-ZAHLUNG\\n\\nSende die Zahlung an diese BNB Smart Chain-Adresse:\\n\\n' + wallets.BNB + '\\n\\n⚠️ Nur BNB Smart Chain (BEP-20) verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
   if (data.startsWith('add:')) {
@@ -432,6 +493,7 @@ module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
   sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
+  getPendingCryptoPayments, markOrderPaid, getCryptoPriceEur,
   invoiceText, webhookSecret, supportUsername, supportChatId, botOrderUrl, supportUrl,
   getBusinessStatus: () => ({
     connections: Array.from(businessConnections.values()).map(c => ({
