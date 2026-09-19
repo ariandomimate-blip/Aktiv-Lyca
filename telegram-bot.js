@@ -390,9 +390,6 @@ async function handleCallback(q) {
       return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
     }
   }
-\\n\\nSende die Zahlung an diese Bitcoin-Adresse:\\n\\n' + wallets.BTC + '\\n\\n⚠️ Nur Bitcoin-Netzwerk verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
-  if (data === 'pay:sol') return sendMessage(chatId, '◎ SOLANA-ZAHLUNG\\n\\nSende die Zahlung an diese Solana-Adresse:\\n\\n' + wallets.SOL + '\\n\\n⚠️ Nur Solana-Netzwerk verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
-  if (data === 'pay:bnb') return sendMessage(chatId, '◈ BNB SMART CHAIN-ZAHLUNG\\n\\nSende die Zahlung an diese BNB Smart Chain-Adresse:\\n\\n' + wallets.BNB + '\\n\\n⚠️ Nur BNB Smart Chain (BEP-20) verwenden. Nach der Überweisung bitte die TXID an @' + supportUsername + ' senden.', { reply_markup: cryptoPaymentKeyboard() });
   if (data.startsWith('add:')) {
     const [, productId, qtyText] = data.split(':');
     const qty = Number(qtyText);
