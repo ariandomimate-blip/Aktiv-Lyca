@@ -352,7 +352,7 @@ async function scanBitcoinPayments(pending) {
         return Boolean(tx?.status?.confirmed) && sameOrGreater(received, intent.cryptoAmount);
       });
       if (candidates.length) {
-        await telegram.markOrderPaid(intent.orderNumber, { coin:'BTC', txid:candidates[0].txid });
+        await telegram.markPaymentDetected(intent.orderNumber, { coin:'BTC', txid:candidates[0].txid });
       }
     }
   } catch (err) { console.error('BTC payment monitor:', err.message || err); }
@@ -384,7 +384,7 @@ async function scanSolanaPayments(pending) {
         if (index < 0) continue;
         const received = (Number(tx.meta.postBalances[index]) - Number(tx.meta.preBalances[index])) / 1e9;
         if (sameOrGreater(received, intent.cryptoAmount)) {
-          await telegram.markOrderPaid(intent.orderNumber, { coin:'SOL', txid:sig.signature });
+          await telegram.markPaymentDetected(intent.orderNumber, { coin:'SOL', txid:sig.signature });
         }
       }
     }
@@ -420,7 +420,7 @@ async function scanBnbPayments(pending) {
         for (const intent of intents) {
           if (blockTime + 120000 < intent.createdAt) continue;
           if (sameOrGreater(received, intent.cryptoAmount)) {
-            await telegram.markOrderPaid(intent.orderNumber, { coin:'BNB', txid:tx.hash });
+            await telegram.markPaymentDetected(intent.orderNumber, { coin:'BNB', txid:tx.hash });
           }
         }
       }
