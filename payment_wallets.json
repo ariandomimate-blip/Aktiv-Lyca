@@ -1,14 +1,18 @@
 {
-  "brand": "Rea.Signature",
+  "brand": "Webshop SIM",
   "payment_wallets": {
-    "BNB_SMART_CHAIN": "0xf183a3cD59887d6C3dc0b66E38073f0Ec141334"
+    "BTC": "bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx",
+    "SOL": "2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA",
+    "BNB_SMART_CHAIN": "0x7f6dde8179319425917eD0c9fd84952f98b0C2A4"
   },
   "telegram": {
-    "enabled": false
+    "enabled": false,
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "chat_id_env": "TELEGRAM_CHAT_ID"
   },
   "balance_display": {
-    "enabled": false,
+    "enabled": true,
     "source": "blockchain_api",
-    "note": "Only the public Rea.Signature BNB Smart Chain wallet is used for checkout. Never store private keys or seed phrases."
+    "note": "Never store private keys in this repository. Balances must be queried from public wallet addresses."
   }
 }
