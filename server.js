@@ -19,7 +19,13 @@ function normalizeTelegramToken(value) {
 
   return token;
 }
-process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
+const telegramTokenEnv =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.TELEGRAM_TOKEN ||
+  process.env.TELEGRAM_API_TOKEN ||
+  process.env.BOT_TOKEN ||
+  '';
+process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(telegramTokenEnv);
 
 const telegram = require('./telegram-bot');
 
@@ -56,7 +62,12 @@ function makeInvoiceNumber(orderNumber) { return orderNumber.replace(/^LYCA-/, '
 function formatInvoice(order) { return telegram.invoiceText(order); }
 
 async function telegramApi(method, body = {}) {
-  const token = normalizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
+  const token = normalizeTelegramToken(
+    process.env.TELEGRAM_BOT_TOKEN ||
+    process.env.TELEGRAM_TOKEN ||
+    process.env.TELEGRAM_API_TOKEN ||
+    process.env.BOT_TOKEN
+  );
   if (!token) return { ok:false, description:'TELEGRAM_BOT_TOKEN fehlt' };
   try {
     const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
