@@ -325,4 +325,123 @@ const server = http.createServer(async (req,res) => {
 });
 function sendFile(filePath,res){ fs.readFile(filePath,(err,data)=>{ if(err){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Not Found');} const ext=path.extname(filePath).toLowerCase(); res.writeHead(200,{'Content-Type':mimeTypes[ext]||'application/octet-stream','Cache-Control':ext==='.html'?'no-cache':'public, max-age=3600'}); res.end(data); }); }
 
+
+const PAYMENT_MONITOR_INTERVAL_MS = 30000;
+let lastBscBlock = null;
+
+async function fetchJson(url, options = {}) {
+  const r = await fetch(url, options);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || data?.error || `HTTP ${r.status}`);
+  return data;
+}
+function sameOrGreater(actual, expected) {
+  return Number.isFinite(actual) && Number.isFinite(expected) && actual + 1e-12 >= expected;
+}
+
+async function scanBitcoinPayments(pending) {
+  const intents = pending.filter(p => p.coin === 'BTC');
+  if (!intents.length) return;
+  try {
+    const txs = await fetchJson(`https://mempool.space/api/address/${encodeURIComponent(telegram.wallets.BTC)}/txs`);
+    for (const intent of intents) {
+      const candidates = txs.filter(tx => {
+        const blockTime = Number(tx?.status?.block_time || 0) * 1000;
+        if (!blockTime || blockTime + 120000 < intent.createdAt) return false;
+        const received = (tx.vout || []).filter(v => v.scriptpubkey_address === telegram.wallets.BTC).reduce((sum,v) => sum + Number(v.value || 0), 0) / 1e8;
+        return Boolean(tx?.status?.confirmed) && sameOrGreater(received, intent.cryptoAmount);
+      });
+      if (candidates.length) {
+        await telegram.markOrderPaid(intent.orderNumber, { coin:'BTC', txid:candidates[0].txid });
+      }
+    }
+  } catch (err) { console.error('BTC payment monitor:', err.message || err); }
+}
+
+async function solanaRpc(method, params) {
+  return fetchJson('https://api.mainnet.solana.com', {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
+  });
+}
+async function scanSolanaPayments(pending) {
+  const intents = pending.filter(p => p.coin === 'SOL');
+  if (!intents.length) return;
+  try {
+    const sigData = await solanaRpc('getSignaturesForAddress', [telegram.wallets.SOL, {limit:20, commitment:'finalized'}]);
+    for (const sig of sigData?.result || []) {
+      if (sig.err) continue;
+      const blockTime = Number(sig.blockTime || 0) * 1000;
+      if (!blockTime) continue;
+      for (const intent of intents) {
+        if (blockTime + 120000 < intent.createdAt) continue;
+        const txData = await solanaRpc('getTransaction', [sig.signature, {commitment:'finalized',maxSupportedTransactionVersion:1,encoding:'jsonParsed'}]);
+        const tx = txData?.result;
+        if (!tx?.meta?.preBalances || !tx?.meta?.postBalances) continue;
+        const keys = tx.transaction?.message?.accountKeys || [];
+        const index = keys.findIndex(k => (typeof k === 'string' ? k : k.pubkey) === telegram.wallets.SOL);
+        if (index < 0) continue;
+        const received = (Number(tx.meta.postBalances[index]) - Number(tx.meta.preBalances[index])) / 1e9;
+        if (sameOrGreater(received, intent.cryptoAmount)) {
+          await telegram.markOrderPaid(intent.orderNumber, { coin:'SOL', txid:sig.signature });
+        }
+      }
+    }
+  } catch (err) { console.error('SOL payment monitor:', err.message || err); }
+}
+
+async function bscRpc(method, params) {
+  const r = await fetchJson('https://bsc-dataseed.bnbchain.org', {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
+  });
+  if (r.error) throw new Error(r.error.message || 'BSC RPC error');
+  return r;
+}
+async function scanBnbPayments(pending) {
+  const intents = pending.filter(p => p.coin === 'BNB');
+  if (!intents.length) return;
+  try {
+    const latestHex = (await bscRpc('eth_blockNumber', [])).result;
+    const latest = parseInt(latestHex,16);
+    if (!Number.isFinite(latest)) return;
+    if (lastBscBlock === null) { lastBscBlock = latest; return; }
+    const from = Math.max(lastBscBlock + 1, latest - 5);
+    for (let n = from; n <= latest; n++) {
+      const block = (await bscRpc('eth_getBlockByNumber', ['0x' + n.toString(16), true])).result;
+      if (!block) continue;
+      const blockTime = parseInt(block.timestamp,16) * 1000;
+      for (const tx of block.transactions || []) {
+        if (String(tx.to || '').toLowerCase() !== telegram.wallets.BNB.toLowerCase()) continue;
+        const received = Number(BigInt(tx.value || '0x0')) / 1e18;
+        if (!(received > 0)) continue;
+        for (const intent of intents) {
+          if (blockTime + 120000 < intent.createdAt) continue;
+          if (sameOrGreater(received, intent.cryptoAmount)) {
+            await telegram.markOrderPaid(intent.orderNumber, { coin:'BNB', txid:tx.hash });
+          }
+        }
+      }
+    }
+    lastBscBlock = latest;
+  } catch (err) { console.error('BNB payment monitor:', err.message || err); }
+}
+
+let paymentMonitorRunning = false;
+async function monitorCryptoPayments() {
+  if (paymentMonitorRunning) return;
+  paymentMonitorRunning = true;
+  try {
+    const pending = telegram.getPendingCryptoPayments();
+    if (!pending.length) return;
+    await Promise.all([scanBitcoinPayments(pending), scanSolanaPayments(pending), scanBnbPayments(pending)]);
+  } finally {
+    paymentMonitorRunning = false;
+  }
+}
+setInterval(monitorCryptoPayments, PAYMENT_MONITOR_INTERVAL_MS);
+setTimeout(monitorCryptoPayments, 8000);
+
 server.listen(port,'0.0.0.0',()=>{ console.log(`Lyca Webshop server listening on port ${port}`); setupTelegram(); });
