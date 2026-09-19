@@ -1,8 +1,8 @@
 {
   "brand": "Webshop SIM",
   "payment_wallets": {
-    "BTC": "bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx",
-    "SOL": "2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA",
+    "BTC": "bc1qh7pkra6dzavph6ed072hz30aa42nqx8kr9as3",
+    "SOL": "DjXkr2jd3DsHkDAxQyDofpaf42FcXNQz1GhnNsY3EsS2",
     "BNB_SMART_CHAIN": "0xB930ccb889b6686A31Af9A95d45f67221AAF85Cd"
   },
   "telegram": {
