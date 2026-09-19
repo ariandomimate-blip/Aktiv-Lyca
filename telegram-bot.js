@@ -15,7 +15,7 @@ const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').r
 const wallets = {
   BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
   SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
-  BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
+  BNB: process.env.BNB_WALLET || '0xB930ccb889b6686A31Af9A95d45f67221AAF85Cd'
 };
 
 const orders = new Map();
