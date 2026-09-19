@@ -14,9 +14,9 @@ if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 
 const wallets = {
-  BTC: process.env.BTC_WALLET || '',
-  SOL: process.env.SOL_WALLET || '',
-  BNB: process.env.BNB_WALLET || ''
+  BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
+  SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
+  BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
 };
 
 const orders = new Map();
@@ -179,7 +179,27 @@ function productText() {
 function checkoutText(chatId) {
   const cart = cartItems(chatId);
   if (!cart.length) return '🛒 Dein Warenkorb ist leer. Wähle zuerst ein Produkt.';
-  return `🧾 ZUSAMMENFASSUNG\n\n${cart.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.unitPrice)} / Stück`).join('\n')}\n\n────────────────\n💶 Gesamt: ${formatMoney(cartTotal(chatId))}\n\nFür die vollständige Bestellung mit Name, E-Mail und Anschrift öffnest du jetzt den Lyca-Webshop.`;
+  return `🧾 KASSE · ZUSAMMENFASSUNG
+
+${cart.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.unitPrice)} / Stück`).join('\n')}
+
+────────────────
+💶 Gesamt: ${formatMoney(cartTotal(chatId))}
+
+💳 ZAHLUNG PER KRYPTO
+
+₿ Bitcoin:
+${wallets.BTC}
+
+◎ Solana:
+${wallets.SOL}
+
+◈ BNB Smart Chain:
+${wallets.BNB}
+
+⚠️ Nur das passende Netzwerk für die jeweilige Adresse verwenden.
+
+Für die vollständige Bestellung mit Name, E-Mail und Anschrift öffnest du jetzt den Lyca-Webshop.`;
 }
 
 async function sendOrder(order) {
