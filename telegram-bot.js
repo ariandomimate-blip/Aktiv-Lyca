@@ -148,6 +148,22 @@ function quantityKeyboard() {
     [callback('↩️ Produkte', 'products')]
   ] };
 }
+async function showPaymentScreen(chatId) {
+  const total = formatMoney(cartTotal(chatId));
+  const text = '💳 ZAHLUNG – LYCA WEBSHOP\n\n' +
+    'Bitte sende exakt den angezeigten Betrag an eine der folgenden Wallets.\n' +
+    'Nutze nur das angegebene Netzwerk.\n\n' +
+    '₿ Bitcoin Wallet\n' + wallets.BTC + '\n\n' +
+    '◎ Solana Wallet\n' + wallets.SOL + '\n\n' +
+    '◈ BNB Smart Chain Wallet\n' + wallets.BNB + '\n\n' +
+    '💶 Gesamtbetrag: ' + total + '\n\n' +
+    '⚠️ Wichtige Hinweise:\n' +
+    '• Nur den angezeigten Betrag senden.\n' +
+    '• Ausschließlich das passende Netzwerk verwenden.\n' +
+    '• Nach Zahlungseingang erfolgt eine manuelle Prüfung.\n' +
+    '• Danach wird die Bestellung als BEZAHLT bestätigt.';
+  return sendMessage(chatId, text, { reply_markup: cryptoPaymentKeyboard() });
+}
 function cryptoPaymentKeyboard() {
   return { inline_keyboard: [
     [callback('₿ Bitcoin bezahlen', 'pay:btc')],
@@ -178,6 +194,7 @@ async function api(method, body = {}) {
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
 async function sendMessage(chatId, text, extra = {}) { return api('sendMessage', { chat_id: chatId, text, ...extra }); }
+async function sendPhoto(chatId, photo, caption = '', extra = {}) { return api('sendPhoto', { chat_id: chatId, photo, ...(caption ? { caption } : {}), ...extra }); }
 const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
 const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
 const aiEnabled = String(process.env.AI_ENABLED || 'true').toLowerCase() !== 'false';
@@ -400,7 +417,7 @@ async function handleCallback(q) {
   if (data === 'ai') return sendMessage(chatId, '🤖 KI-ASSISTENT\n\nSchreibe deine Frage direkt hier in den Chat oder nutze /ai gefolgt von deiner Frage.\n\nBeispiele:\n• Wie bestelle ich?\n• Wo ist meine Rechnung?\n• Wie funktioniert der Warenkorb?', { reply_markup: mainKeyboard() });
   if (data === 'checkout') {
     if (!cartItems(chatId).length) return showCart(chatId, messageId);
-    return editMessage(chatId, messageId, checkoutText(chatId), cryptoPaymentKeyboard());
+    return showPaymentScreen(chatId);
   }
   if (data === 'pay:btc' || data === 'pay:sol' || data === 'pay:bnb') {
     const coin = data === 'pay:btc' ? 'BTC' : data === 'pay:sol' ? 'SOL' : 'BNB';
@@ -408,7 +425,9 @@ async function handleCallback(q) {
       const result = await createCryptoPayment(chatId, coin);
       if (!result.ok) return sendMessage(chatId, '⚠️ ' + result.description, { reply_markup: cryptoPaymentKeyboard() });
       const p = result.intent;
-      return sendMessage(chatId, `💳 ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Sobald der Zahlungseingang erkannt wurde, erhält der Administrator eine Prüfmeldung. Erst nach seiner Bestätigung wird die Bestellung auf BEZAHLT gesetzt und die Rechnung an dich gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
+      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=' + encodeURIComponent(p.wallet);
+      const paymentCaption = '💳 ' + coin + '-ZAHLUNG\n\n🔢 Bestellung: ' + p.orderNumber + '\n💶 Warenwert: ' + formatMoney(p.eurTotal) + '\n\n📤 EXAKT SENDEN:\n' + p.cryptoAmount + ' ' + coin + '\n\n📍 WALLET:\n' + p.wallet + '\n\n⚠️ Nur das angegebene Netzwerk verwenden.\n\nDer Shop überwacht den Zahlungseingang. Nach Erkennung prüft und bestätigt der Administrator die Zahlung. Danach wird die Rechnung mit dem Status BEZAHLT gesendet.';
+      return sendPhoto(chatId, qrUrl, paymentCaption, { reply_markup: cryptoPaymentKeyboard() });
     } catch (err) {
       return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
     }
