@@ -3,7 +3,7 @@
   "payment_wallets": {
     "BTC": "bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx",
     "SOL": "2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA",
-    "BNB_SMART_CHAIN": "0x7f6dde8179319425917eD0c9fd84952f98b0C2A4"
+    "BNB_SMART_CHAIN": "0xB930ccb889b6686A31Af9A95d45f67221AAF85Cd"
   },
   "telegram": {
     "enabled": false,
@@ -14,5 +14,6 @@
     "enabled": true,
     "source": "blockchain_api",
     "note": "Never store private keys in this repository. Balances must be queried from public wallet addresses."
-  }
+  },
+  "updated_at": "2026-09-20"
 }
