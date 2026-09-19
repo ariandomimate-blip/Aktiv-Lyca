@@ -150,12 +150,18 @@ function quantityKeyboard() {
 }
 async function showPaymentScreen(chatId) {
   const total = formatMoney(cartTotal(chatId));
+  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/btc-wallet.png',
+    '₿ BITCOIN · BTC\nWallet: ' + wallets.BTC + '\n\nNur BTC über das Bitcoin-Netzwerk an diese Adresse senden.');
+  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/sol-wallet.png',
+    '◎ SOLANA · SOL\nWallet: ' + wallets.SOL + '\n\nNur SOL über das Solana-Netzwerk an diese Adresse senden.');
+  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/bnb-wallet.png',
+    '◈ BNB SMART CHAIN · BNB\nWallet: ' + wallets.BNB + '\n\nNur BNB über BNB Smart Chain (BSC) an diese Adresse senden.');
   const text = '💳 ZAHLUNG – LYCA WEBSHOP\n\n' +
-    'Bitte sende exakt den angezeigten Betrag an eine der folgenden Wallets.\n' +
-    'Nutze nur das angegebene Netzwerk.\n\n' +
-    '₿ Bitcoin Wallet\n' + wallets.BTC + '\n\n' +
-    '◎ Solana Wallet\n' + wallets.SOL + '\n\n' +
-    '◈ BNB Smart Chain Wallet\n' + wallets.BNB + '\n\n' +
+    'Bitte sende exakt den angezeigten Betrag an eine der drei Wallets.\n' +
+    'Nutze ausschließlich das jeweils angegebene Netzwerk.\n\n' +
+    '₿ BTC: ' + wallets.BTC + '\n' +
+    '◎ SOL: ' + wallets.SOL + '\n' +
+    '◈ BNB: ' + wallets.BNB + '\n\n' +
     '💶 Gesamtbetrag: ' + total + '\n\n' +
     '⚠️ Wichtige Hinweise:\n' +
     '• Nur den angezeigten Betrag senden.\n' +
