@@ -66,16 +66,39 @@ async function createCryptoPayment(chatId, coin) {
   return { ok:true, intent };
 }
 function getPendingCryptoPayments() { return Array.from(cryptoPayments.values()).filter(p => p.status === 'UNBEZAHLT'); }
-async function markOrderPaid(orderNumber, payment) {
+function adminPaymentKeyboard(orderNumber) {
+  return { inline_keyboard: [
+    [callback('✅ Zahlung bestätigen & Rechnung senden', `admin:confirm-paid:${orderNumber}`)],
+    [callback('📋 Bestellung anzeigen', `order:${orderNumber}`)]
+  ] };
+}
+async function markPaymentDetected(orderNumber, payment) {
   const order = getOrder(orderNumber);
   if (!order || order.paymentStatus === 'BEZAHLT') return false;
-  order.paymentStatus = 'BEZAHLT';
+  const intent = cryptoPayments.get(orderNumber);
+  if (intent && intent.status !== 'UNBEZAHLT') return false;
+  order.paymentStatus = 'ZAHLUNG_ERKANNT';
   order.paymentMethod = payment.coin;
   order.paymentTxId = payment.txid;
-  order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  order.paymentDetectedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  if (intent) { intent.status='ZAHLUNG_ERKANNT'; intent.txid=payment.txid; intent.detectedAt=Date.now(); }
+  const msg = `🔔 ZAHLUNG ERKANNT – ADMIN-BESTÄTIGUNG ERFORDERLICH\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n💶 Betrag: ${formatMoney(order.total)}\\n\\nDie Blockchain-Zahlung wurde erkannt. Bitte als Administrator prüfen und bestätigen. Erst danach wird die Rechnung als BEZAHLT an den Kunden gesendet.`;
+  for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: adminPaymentKeyboard(order.orderNumber) });
+  return true;
+}
+async function markOrderPaid(orderNumber, payment) { return confirmOrderPaid(orderNumber, payment); }
+async function confirmOrderPaid(orderNumber, payment = {}) {
+  const order = getOrder(orderNumber);
+  if (!order || order.paymentStatus === 'BEZAHLT') return false;
   const intent = cryptoPayments.get(orderNumber);
-  if (intent) { intent.status='BEZAHLT'; intent.txid=payment.txid; intent.detectedAt=Date.now(); }
-  const msg = `✅ ZAHLUNG BEZAHLT\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n📅 Bezahlt: ${order.paidAt}\\n\\n${invoiceText(order)}`;
+  const coin = payment.coin || intent?.coin || order.paymentMethod || 'Krypto';
+  const txid = payment.txid || intent?.txid || order.paymentTxId || 'manuell bestätigt';
+  order.paymentStatus = 'BEZAHLT';
+  order.paymentMethod = coin;
+  order.paymentTxId = txid;
+  order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  if (intent) { intent.status='BEZAHLT'; intent.txid=txid; intent.confirmedAt=Date.now(); }
+  const msg = `✅ ZAHLUNG VOM ADMINISTRATOR BESTÄTIGT\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${coin}\\n🔗 TXID: ${txid}\\n📅 Bezahlt: ${order.paidAt}\\n\\n${invoiceText(order)}`;
   const customerChatId = String(order.telegramChatId || intent?.chatId || '').trim();
   if (customerChatId) await sendMessage(customerChatId, msg, { reply_markup: orderKeyboard(order) });
   for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: orderKeyboard(order) });
@@ -273,7 +296,7 @@ async function sendOrder(order) {
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     try {
-      const customerMessage = `✅ BESTELLUNG ERFOLGREICH ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n${invoiceText(order)}\n\n📌 Zahlungsstatus: ${order.paymentStatus}\n\nDeine Bestellung und Rechnung sind jetzt direkt in Telegram verfügbar.`;
+      const customerMessage = `✅ BESTELLUNG ERFOLGREICH ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n📌 Zahlungsstatus: ${order.paymentStatus}\n\nDeine Rechnung wird erst nach Prüfung und Bestätigung der Zahlung durch den Administrator gesendet.`;
       const result = await sendMessage(customerChatId, customerMessage, { reply_markup: orderKeyboard(order) });
       customerNotified = Boolean(result.ok);
       if (!result.ok) console.error(`Lyca Bot: failed to send customer confirmation: ${result.description || 'unknown Telegram error'}`);
@@ -385,7 +408,7 @@ async function handleCallback(q) {
       const result = await createCryptoPayment(chatId, coin);
       if (!result.ok) return sendMessage(chatId, '⚠️ ' + result.description, { reply_markup: cryptoPaymentKeyboard() });
       const p = result.intent;
-      return sendMessage(chatId, `💳 ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Nach bestätigtem Eingang wird die Bestellung automatisch auf BEZAHLT gesetzt und die Rechnung erneut mit Zahlungsstatus BEZAHLT gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
+      return sendMessage(chatId, `💳 ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Sobald der Zahlungseingang erkannt wurde, erhält der Administrator eine Prüfmeldung. Erst nach seiner Bestätigung wird die Bestellung auf BEZAHLT gesetzt und die Rechnung an dich gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
     } catch (err) {
       return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
     }
@@ -398,8 +421,21 @@ async function handleCallback(q) {
     }
     return showProduct(chatId, messageId);
   }
+  if (data.startsWith('admin:confirm-paid:')) {
+    if (!adminChatIds.has(String(chatId))) return sendMessage(chatId, '⛔ Nur der Shop-Administrator darf Zahlungen bestätigen.');
+    const orderNumber = data.slice('admin:confirm-paid:'.length);
+    const order = getOrder(orderNumber);
+    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
+    if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, 'ℹ️ Diese Bestellung ist bereits als BEZAHLT bestätigt.', { reply_markup: orderKeyboard(order) });
+    const intent = cryptoPayments.get(orderNumber);
+    if (!intent || intent.status !== 'ZAHLUNG_ERKANNT') return sendMessage(chatId, '⚠️ Für diese Bestellung wurde noch kein bestätigter Zahlungseingang erkannt. Prüfe zuerst den Zahlungseingang.', { reply_markup: orderKeyboard(order) });
+    const ok = await confirmOrderPaid(orderNumber, { coin:intent.coin, txid:intent.txid });
+    return sendMessage(chatId, ok ? '✅ Zahlung bestätigt. Die Rechnung wurde jetzt an den Kunden gesendet.' : '⚠️ Zahlung konnte nicht bestätigt werden.', { reply_markup: orderKeyboard(order) });
+  }
   if (data.startsWith('invoice:')) {
     const order = getOrder(data.slice(8));
+    if (order && order.paymentStatus !== 'BEZAHLT' && adminChatIds.has(String(chatId))) return sendMessage(chatId, invoiceText(order), { reply_markup: orderKeyboard(order) });
+    if (order && order.paymentStatus !== 'BEZAHLT') return sendMessage(chatId, '🧾 Die Rechnung wird nach Administrator-Bestätigung der Zahlung freigegeben.', { reply_markup: orderKeyboard(order) });
     return sendMessage(chatId, order ? invoiceText(order) : 'Rechnung nicht gefunden.', { reply_markup: orderKeyboard(order) });
   }
   if (data.startsWith('order:')) {
@@ -448,8 +484,16 @@ async function handleUpdate(update) {
     if (!adminChatIds.has(String(chatId))) return sendMessage(chatId, 'Dieser Befehl ist nur für den Shop-Administrator verfügbar.', { reply_markup: mainKeyboard() });
     const order = getOrder(parts[1]);
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.', { reply_markup: mainKeyboard() });
-    order.paymentStatus = command === '/paid' ? 'BEZAHLT' : 'UNBEZAHLT';
-    return sendMessage(chatId, `✅ ${order.orderNumber}: ${order.paymentStatus}`, { reply_markup: orderKeyboard(order) });
+    if (command === '/unpaid') {
+      order.paymentStatus = 'UNBEZAHLT';
+      const intent = cryptoPayments.get(order.orderNumber);
+      if (intent) intent.status = 'UNBEZAHLT';
+      return sendMessage(chatId, `↩️ ${order.orderNumber}: UNBEZAHLT`, { reply_markup: orderKeyboard(order) });
+    }
+    const intent = cryptoPayments.get(order.orderNumber);
+    if (!intent?.txid) return sendMessage(chatId, '⚠️ Noch kein erkannter Zahlungseingang vorhanden. Nutze /paid erst nach Prüfung des Zahlungseingangs.', { reply_markup: orderKeyboard(order) });
+    const ok = await confirmOrderPaid(order.orderNumber, { coin:intent.coin, txid:intent.txid });
+    return sendMessage(chatId, ok ? `✅ Zahlung bestätigt: ${order.orderNumber}. Die Rechnung wurde an den Kunden gesendet.` : '⚠️ Zahlung konnte nicht bestätigt werden.', { reply_markup: orderKeyboard(order) });
   }
   if (/^(test|hallo|hi|hey)$/i.test(text)) return showHome(chatId);
   if (/warenkorb|cart/i.test(text)) return showCart(chatId);
@@ -490,7 +534,7 @@ module.exports = {
   enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
   sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
-  getPendingCryptoPayments, markOrderPaid, getCryptoPriceEur,
+  getPendingCryptoPayments, markPaymentDetected, markOrderPaid, confirmOrderPaid, getCryptoPriceEur,
   invoiceText, webhookSecret, supportUsername, supportChatId, botOrderUrl, supportUrl,
   getBusinessStatus: () => ({
     connections: Array.from(businessConnections.values()).map(c => ({
