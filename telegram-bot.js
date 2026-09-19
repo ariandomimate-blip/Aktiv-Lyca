@@ -12,6 +12,8 @@ const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || proce
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
 if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
+const ammerGatewaySecret = String(process.env.AMMER_GATEWAY_SECRET || '').trim();
+const ammerCurrency = String(process.env.AMMER_CURRENCY || 'EUR').trim().toUpperCase();
 
 const wallets = {
   BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
@@ -98,6 +100,20 @@ async function api(method, body = {}) {
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
 async function sendMessage(chatId, text, extra = {}) { return api('sendMessage', { chat_id: chatId, text, ...extra }); }
+async function sendAmmerInvoice(chatId, cart) {
+  if (!ammerGatewaySecret) return { ok:false, description:'AMMER_GATEWAY_SECRET fehlt' };
+  const totalCents = Math.round(cart.reduce((sum, x) => sum + x.unitPrice * x.qty, 0) * 100);
+  const payload = 'lyca-' + Date.now() + '-' + String(chatId).slice(-8);
+  return api('sendInvoice', {
+    chat_id: chatId,
+    title: 'Lyca Mobile Triple-SIM',
+    description: cart.map(x => x.name + ' · ' + x.qty + ' Stück').join(', '),
+    payload,
+    provider_token: ammerGatewaySecret,
+    currency: ammerCurrency,
+    prices: [{ label:'Lyca Mobile Triple-SIM', amount:totalCents }]
+  });
+}
 
 const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
 const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
@@ -321,7 +337,11 @@ async function handleCallback(q) {
   if (data === 'ai') return sendMessage(chatId, '🤖 KI-ASSISTENT\n\nSchreibe deine Frage direkt hier in den Chat oder nutze /ai gefolgt von deiner Frage.\n\nBeispiele:\n• Wie bestelle ich?\n• Wo ist meine Rechnung?\n• Wie funktioniert der Warenkorb?', { reply_markup: mainKeyboard() });
   if (data === 'checkout') {
     if (!cartItems(chatId).length) return showCart(chatId, messageId);
-    return editMessage(chatId, messageId, checkoutText(chatId), { inline_keyboard: [[webAppButton()], [callback('🛒 Warenkorb', 'cart'), callback('↩️ Start', 'home')]] });
+    const invoice = await sendAmmerInvoice(chatId, cartItems(chatId));
+    if (invoice.ok) {
+      return sendMessage(chatId, '💳 AMMER PAY · KASSE\\n\\nDie Zahlung wird über Ammer Pay gestartet.\\n\\n' + checkoutText(chatId), { reply_markup: { inline_keyboard: [[callback('🛒 Warenkorb', 'cart')], [callback('↩️ Start', 'home')]] } });
+    }
+    return editMessage(chatId, messageId, checkoutText(chatId) + '\\n\\n⚠️ Ammer Pay ist noch nicht vollständig konfiguriert. Bitte prüfe den Gateway Secret in Render.', { inline_keyboard: [[webAppButton()], [callback('🛒 Warenkorb', 'cart'), callback('↩️ Start', 'home')]] });
   }
   if (data.startsWith('add:')) {
     const [, productId, qtyText] = data.split(':');
@@ -341,7 +361,19 @@ async function handleCallback(q) {
   }
 }
 
+async function handlePreCheckoutQuery(q) {
+  return api('answerPreCheckoutQuery', { pre_checkout_query_id:q.id, ok:Boolean(ammerGatewaySecret), ...(ammerGatewaySecret ? {} : { error_message:'Ammer Pay ist momentan nicht konfiguriert.' }) });
+}
+async function handleSuccessfulPayment(msg) {
+  const payment = msg.successful_payment;
+  if (!payment) return;
+  clearCart(msg.chat.id);
+  return sendMessage(msg.chat.id, '✅ ZAHLUNG ERFOLGREICH\\n\\n💳 Ammer Pay\\n🔖 Zahlungs-ID: ' + payment.telegram_payment_charge_id + '\\n\\nDeine Bestellung wird jetzt weiterverarbeitet.', { reply_markup: mainKeyboard() });
+}
+
 async function handleUpdate(update) {
+  if (update.pre_checkout_query) return handlePreCheckoutQuery(update.pre_checkout_query);
+  if (update.message?.successful_payment) return handleSuccessfulPayment(update.message);
   if (update.business_connection) { await handleBusinessConnection(update.business_connection); return; }
   if (update.business_message) { await handleBusinessMessage(update.business_message); return; }
   if (update.edited_business_message || update.deleted_business_messages) return;
