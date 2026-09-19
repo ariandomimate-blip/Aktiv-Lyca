@@ -13,7 +13,9 @@ const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
 if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 const wallets = {
-  BNB: process.env.BNB_WALLET || '0xf183a3cD59887d6C3dc0b66E38073f0Ec141334'
+  BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
+  SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
+  BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
 };
 
 const orders = new Map();
@@ -49,7 +51,7 @@ async function getCryptoPriceEur(coin) {
   }
   throw new Error('Krypto-Kurs konnte nicht abgerufen werden.');
 }
-function cryptoDecimals(coin) { return 8; }
+function cryptoDecimals(coin) { return coin === 'SOL' ? 9 : 8; }
 async function createCryptoPayment(chatId, coin) {
   const session = getSession(chatId);
   const order = session.lastOrder ? getOrder(session.lastOrder) : null;
@@ -80,7 +82,7 @@ async function markPaymentDetected(orderNumber, payment) {
   order.paymentTxId = payment.txid;
   order.paymentDetectedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
   if (intent) { intent.status='ZAHLUNG_ERKANNT'; intent.txid=payment.txid; intent.detectedAt=Date.now(); }
-  const msg = `🔔 ZAHLUNG ERKANNT – ADMIN-BESTÄTIGUNG ERFORDERLICH\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: Rea.Signature · ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n💶 Betrag: ${formatMoney(order.total)}\\n\\nDie Blockchain-Zahlung wurde erkannt. Bitte als Administrator prüfen und bestätigen. Erst danach wird die Rechnung als BEZAHLT an den Kunden gesendet.`;
+  const msg = `🔔 ZAHLUNG ERKANNT – ADMIN-BESTÄTIGUNG ERFORDERLICH\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n💶 Betrag: ${formatMoney(order.total)}\\n\\nDie Blockchain-Zahlung wurde erkannt. Bitte als Administrator prüfen und bestätigen. Erst danach wird die Rechnung als BEZAHLT an den Kunden gesendet.`;
   for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: adminPaymentKeyboard(order.orderNumber) });
   return true;
 }
@@ -148,7 +150,9 @@ function quantityKeyboard() {
 }
 function cryptoPaymentKeyboard() {
   return { inline_keyboard: [
-    [callback('◈ BNB Smart Chain bezahlen · Rea.Signature', 'pay:bnb')],
+    [callback('₿ Bitcoin bezahlen', 'pay:btc')],
+    [callback('◎ Solana bezahlen', 'pay:sol')],
+    [callback('◈ BNB Smart Chain bezahlen', 'pay:bnb')],
     [callback('🛒 Warenkorb', 'cart'), callback('↩️ Start', 'home')]
   ] };
 }
@@ -261,7 +265,13 @@ ${cart.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.unitPrice)}
 ────────────────
 💶 Gesamt: ${formatMoney(cartTotal(chatId))}
 
-💳 ZAHLUNG PER REA.SIGNATURE
+💳 ZAHLUNG PER KRYPTO
+
+₿ Bitcoin:
+${wallets.BTC}
+
+◎ Solana:
+${wallets.SOL}
 
 ◈ BNB Smart Chain:
 ${wallets.BNB}
@@ -398,7 +408,7 @@ async function handleCallback(q) {
       const result = await createCryptoPayment(chatId, coin);
       if (!result.ok) return sendMessage(chatId, '⚠️ ' + result.description, { reply_markup: cryptoPaymentKeyboard() });
       const p = result.intent;
-      return sendMessage(chatId, `💳 REA.SIGNATURE · ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Sobald der Zahlungseingang erkannt wurde, erhält der Administrator eine Prüfmeldung. Erst nach seiner Bestätigung wird die Bestellung auf BEZAHLT gesetzt und die Rechnung an dich gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
+      return sendMessage(chatId, `💳 ${coin}-ZAHLUNG\\n\\n🔢 Bestellung: ${p.orderNumber}\\n💶 Warenwert: ${formatMoney(p.eurTotal)}\\n\\nBitte exakt diesen Betrag senden:\\n${p.cryptoAmount} ${coin}\\n\\n📍 Wallet:\\n${p.wallet}\\n\\nDer Shop überwacht die Blockchain. Sobald der Zahlungseingang erkannt wurde, erhält der Administrator eine Prüfmeldung. Erst nach seiner Bestätigung wird die Bestellung auf BEZAHLT gesetzt und die Rechnung an dich gesendet.\\n\\n⚠️ Nur das angegebene Netzwerk verwenden.`, { reply_markup: cryptoPaymentKeyboard() });
     } catch (err) {
       return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
     }
