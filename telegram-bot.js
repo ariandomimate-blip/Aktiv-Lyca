@@ -12,17 +12,10 @@ const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || proce
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
 if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
-const wallets = {
-  BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
-  SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
-  BNB: process.env.BNB_WALLET || '0xB930ccb889b6686A31Af9A95d45f67221AAF85Cd'
-};
-
 const orders = new Map();
 const sessions = new Map();
 const businessConnections = new Map();
 const businessConnectionUsers = new Map();
-const cryptoPayments = new Map();
 
 const products = {
   lyca: {
@@ -34,78 +27,7 @@ const products = {
 };
 
 
-async function getCryptoPriceEur(coin) {
-  const symbol = { BTC:'BTC', SOL:'SOL', BNB:'BNB' }[coin];
-  if (!symbol) throw new Error('Unbekannte Kryptowährung');
-  const urls = [
-    `https://data-api.binance.vision/api/v3/ticker/price?symbol=${symbol}EUR`,
-    `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}EUR`
-  ];
-  for (const url of urls) {
-    try {
-      const r = await fetch(url);
-      const data = await r.json();
-      const price = Number(data?.price);
-      if (r.ok && Number.isFinite(price) && price > 0) return price;
-    } catch {}
-  }
-  throw new Error('Krypto-Kurs konnte nicht abgerufen werden.');
-}
-function cryptoDecimals(coin) { return coin === 'SOL' ? 9 : 8; }
-async function createCryptoPayment(chatId, coin) {
-  const session = getSession(chatId);
-  const order = session.lastOrder ? getOrder(session.lastOrder) : null;
-  if (!order) return { ok:false, description:'Keine Bestellung im Chat ausgewählt. Öffne zuerst deine Bestellung.' };
-  if (order.paymentStatus === 'BEZAHLT') return { ok:false, description:'Diese Bestellung ist bereits bezahlt.' };
-  const priceEur = await getCryptoPriceEur(coin);
-  const decimals = cryptoDecimals(coin);
-  const amount = Number((order.total / priceEur).toFixed(decimals));
-  if (!(amount > 0)) return { ok:false, description:'Zahlungsbetrag konnte nicht berechnet werden.' };
-  const intent = { orderNumber:order.orderNumber, chatId:String(chatId), coin, wallet:wallets[coin], eurTotal:Number(order.total), cryptoAmount:amount, priceEur, createdAt:Date.now(), status:'UNBEZAHLT' };
-  cryptoPayments.set(order.orderNumber, intent);
-  return { ok:true, intent };
-}
-function getPendingCryptoPayments() { return Array.from(cryptoPayments.values()).filter(p => p.status === 'UNBEZAHLT'); }
-function adminPaymentKeyboard(orderNumber) {
-  return { inline_keyboard: [
-    [callback('✅ Zahlung bestätigen & Rechnung senden', `admin:confirm-paid:${orderNumber}`)],
-    [callback('📋 Bestellung anzeigen', `order:${orderNumber}`)]
-  ] };
-}
-async function markPaymentDetected(orderNumber, payment) {
-  const order = getOrder(orderNumber);
-  if (!order || order.paymentStatus === 'BEZAHLT') return false;
-  const intent = cryptoPayments.get(orderNumber);
-  if (intent && intent.status !== 'UNBEZAHLT') return false;
-  order.paymentStatus = 'ZAHLUNG_ERKANNT';
-  order.paymentMethod = payment.coin;
-  order.paymentTxId = payment.txid;
-  order.paymentDetectedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
-  if (intent) { intent.status='ZAHLUNG_ERKANNT'; intent.txid=payment.txid; intent.detectedAt=Date.now(); }
-  const msg = `🔔 ZAHLUNG ERKANNT – ADMIN-BESTÄTIGUNG ERFORDERLICH\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${payment.coin}\\n🔗 TXID: ${payment.txid}\\n💶 Betrag: ${formatMoney(order.total)}\\n\\nDie Blockchain-Zahlung wurde erkannt. Bitte als Administrator prüfen und bestätigen. Erst danach wird die Rechnung als BEZAHLT an den Kunden gesendet.`;
-  for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: adminPaymentKeyboard(order.orderNumber) });
-  return true;
-}
-async function markOrderPaid(orderNumber, payment) { return confirmOrderPaid(orderNumber, payment); }
-async function confirmOrderPaid(orderNumber, payment = {}) {
-  const order = getOrder(orderNumber);
-  if (!order || order.paymentStatus === 'BEZAHLT') return false;
-  const intent = cryptoPayments.get(orderNumber);
-  const coin = payment.coin || intent?.coin || order.paymentMethod || 'Krypto';
-  const txid = payment.txid || intent?.txid || order.paymentTxId || 'manuell bestätigt';
-  order.paymentStatus = 'BEZAHLT';
-  order.paymentMethod = coin;
-  order.paymentTxId = txid;
-  order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
-  if (intent) { intent.status='BEZAHLT'; intent.txid=txid; intent.confirmedAt=Date.now(); }
-  const msg = `✅ ZAHLUNG VOM ADMINISTRATOR BESTÄTIGT\\n\\n🔢 Bestellung: ${order.orderNumber}\\n💳 Zahlungsmethode: ${coin}\\n🔗 TXID: ${txid}\\n📅 Bezahlt: ${order.paidAt}\\n\\n${invoiceText(order)}`;
-  const customerChatId = String(order.telegramChatId || intent?.chatId || '').trim();
-  if (customerChatId) await sendMessage(customerChatId, msg, { reply_markup: orderKeyboard(order) });
-  for (const adminId of adminChatIds) await sendMessage(adminId, msg, { reply_markup: orderKeyboard(order) });
-  return true;
-}
-
-function formatMoney(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
+(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
 function formatOrder(order) {
   const lines = order.items.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.price)} / Stück`).join('\n');
   return `🛒 LYCA WEBSHOP · NEUE BESTELLUNG\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnung: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n👤 KUNDE\n${order.customer.name}\n${order.customer.address}\n${order.customer.email}\n\n📦 BESTELLUNG\n${lines}\n\n💶 Gesamt: ${formatMoney(order.total)}\n💳 Zahlungsstatus: ${order.paymentStatus}\n\n📩 Support: @${supportUsername}`;
@@ -125,7 +47,7 @@ function callback(text, data) { return { text, callback_data: data }; }
 function mainKeyboard() {
   return { inline_keyboard: [
     [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
-    [callback('📋 Bestellung', 'orders'), callback('🤖 KI-Assistent', 'ai')],
+    [callback('📋 Bestellung', 'orders')],
     [webAppButton()],
     [urlButton('❓ Support', `https://t.me/${supportUsername}`)]
   ] };
@@ -148,37 +70,7 @@ function quantityKeyboard() {
     [callback('↩️ Produkte', 'products')]
   ] };
 }
-async function showPaymentScreen(chatId) {
-  const total = formatMoney(cartTotal(chatId));
-  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/btc-wallet.png',
-    '₿ BITCOIN · BTC\nWallet: ' + wallets.BTC + '\n\nNur BTC über das Bitcoin-Netzwerk an diese Adresse senden.');
-  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/sol-wallet.png',
-    '◎ SOLANA · SOL\nWallet: ' + wallets.SOL + '\n\nNur SOL über das Solana-Netzwerk an diese Adresse senden.');
-  await sendPhoto(chatId, publicBaseUrl + '/assets/payments/bnb-wallet.png',
-    '◈ BNB SMART CHAIN · BNB\nWallet: ' + wallets.BNB + '\n\nNur BNB über BNB Smart Chain (BSC) an diese Adresse senden.');
-  const text = '💳 ZAHLUNG – LYCA WEBSHOP\n\n' +
-    'Bitte sende exakt den angezeigten Betrag an eine der drei Wallets.\n' +
-    'Nutze ausschließlich das jeweils angegebene Netzwerk.\n\n' +
-    '₿ BTC: ' + wallets.BTC + '\n' +
-    '◎ SOL: ' + wallets.SOL + '\n' +
-    '◈ BNB: ' + wallets.BNB + '\n\n' +
-    '💶 Gesamtbetrag: ' + total + '\n\n' +
-    '⚠️ Wichtige Hinweise:\n' +
-    '• Nur den angezeigten Betrag senden.\n' +
-    '• Ausschließlich das passende Netzwerk verwenden.\n' +
-    '• Nach Zahlungseingang erfolgt eine manuelle Prüfung.\n' +
-    '• Danach wird die Bestellung als BEZAHLT bestätigt.';
-  return sendMessage(chatId, text, { reply_markup: cryptoPaymentKeyboard() });
-}
-function cryptoPaymentKeyboard() {
-  return { inline_keyboard: [
-    [callback('₿ Bitcoin bezahlen', 'pay:btc')],
-    [callback('◎ Solana bezahlen', 'pay:sol')],
-    [callback('◈ BNB Smart Chain bezahlen', 'pay:bnb')],
-    [callback('🛒 Warenkorb', 'cart'), callback('↩️ Start', 'home')]
-  ] };
-}
-function cartKeyboard(hasItems) {
+(hasItems) {
   const rows = [];
   if (hasItems) rows.push([callback('✅ Zur Kasse', 'checkout')], [callback('🛍️ Weiter einkaufen', 'products')], [callback('🗑️ Warenkorb leeren', 'cart:clear')]);
   else rows.push([callback('🛍️ Produkte anzeigen', 'products')]);
@@ -201,52 +93,7 @@ async function api(method, body = {}) {
 }
 async function sendMessage(chatId, text, extra = {}) { return api('sendMessage', { chat_id: chatId, text, ...extra }); }
 async function sendPhoto(chatId, photo, caption = '', extra = {}) { return api('sendPhoto', { chat_id: chatId, photo, ...(caption ? { caption } : {}), ...extra }); }
-const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
-const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
-const aiEnabled = String(process.env.AI_ENABLED || 'true').toLowerCase() !== 'false';
-const aiSessions = new Map();
-
-function getAiHistory(chatId) {
-  const key = String(chatId);
-  if (!aiSessions.has(key)) aiSessions.set(key, []);
-  return aiSessions.get(key);
-}
-
-async function openaiReply(chatId, userText) {
-  if (!aiEnabled || !openaiApiKey) return null;
-  const history = getAiHistory(chatId);
-  history.push({ role: 'user', content: String(userText || '').slice(0, 8000) });
-  const recent = history.slice(-12);
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: openaiModel,
-        instructions: 'Du bist der KI-Assistent des Lyca Webshops. Antworte auf Deutsch, freundlich und präzise. Hilf bei Shop, Produkten, Bestellung, Rechnung und allgemeinem Support. Erfinde keine Bestell-, Zahlungs- oder Kontodaten. Wenn eine konkrete Bestellung benötigt wird, verlange die Bestellnummer. Du bist ein Support-Assistent und behauptest nicht, ein menschlicher Mitarbeiter zu sein.',
-        input: recent,
-        max_output_tokens: 700
-      })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      console.error('OpenAI API error:', data?.error?.message || `HTTP ${response.status}`);
-      return null;
-    }
-    const answer = String(data.output_text || '').trim();
-    if (!answer) return null;
-    history.push({ role: 'assistant', content: answer });
-    if (history.length > 20) history.splice(0, history.length - 20);
-    return answer;
-  } catch (err) {
-    console.error('OpenAI request failed:', err.message || err);
-    return null;
-  }
-}
-async function sendBusinessMessage(connectionId, chatId, text, extra = {}) { return api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra }); }
+(connectionId, chatId, text, extra = {}) { return api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra }); }
 async function editMessage(chatId, messageId, text, replyMarkup) { return api('editMessageText', { chat_id: chatId, message_id: messageId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }); }
 
 function saveOrder(order) { orders.set(order.orderNumber, order); return order; }
@@ -278,33 +125,7 @@ function cartText(chatId) {
 function productText() {
   return `📱 LYCA MOBILE TRIPLE-SIM\n\n${products.lyca.description}\n\n✓ Standard-, Micro- und Nano-SIM\n✓ Telefonie & SMS\n✓ Mobiles Internet je nach Tarif\n✓ Deutsche Nummer\n\n📦 MENGENPREISE\n10 → 7,00 € / Stück\n50 → 5,00 € / Stück\n100 → 4,50 € / Stück\n200 → 4,00 € / Stück\n250 → 3,80 € / Stück\n500 → 3,50 € / Stück\n\nWähle unten die gewünschte Menge.`;
 }
-function checkoutText(chatId) {
-  const cart = cartItems(chatId);
-  if (!cart.length) return '🛒 Dein Warenkorb ist leer. Wähle zuerst ein Produkt.';
-  return `🧾 KASSE · ZUSAMMENFASSUNG
-
-${cart.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.unitPrice)} / Stück`).join('\n')}
-
-────────────────
-💶 Gesamt: ${formatMoney(cartTotal(chatId))}
-
-💳 ZAHLUNG PER KRYPTO
-
-₿ Bitcoin:
-${wallets.BTC}
-
-◎ Solana:
-${wallets.SOL}
-
-◈ BNB Smart Chain:
-${wallets.BNB}
-
-⚠️ Nur das passende Netzwerk für die jeweilige Adresse verwenden.
-
-Für die vollständige Bestellung mit Name, E-Mail und Anschrift öffnest du jetzt den Lyca-Webshop.`;
-}
-
-async function sendOrder(order) {
+(order) {
   saveOrder(order);
   console.log(`Lyca Bot: new order ${order.orderNumber}`);
   const recipients = Array.from(adminChatIds);
@@ -382,7 +203,7 @@ async function handleBusinessMessage(msg) {
 }
 
 async function showHome(chatId, messageId = null) {
-  const text = '👋 WILLKOMMEN BEIM LYCA WEBSHOP 2\n\n📱 Lyca Mobile Triple-SIM\n🛍️ Produkte direkt ansehen und bestellen\n🛒 Warenkorb verwalten\n🧾 Bestellnummer & Rechnung erhalten\n🤖 KI-Support für Fragen\n💬 Persönlicher Support: @' + supportUsername + '\n\nWähle unten eine Funktion:';
+  const text = '👋 WILLKOMMEN BEIM LYCA WEBSHOP 2\n\n📱 Lyca Mobile Triple-SIM\n🛍️ Produkte direkt ansehen und bestellen\n🛒 Warenkorb verwalten\n🧾 Bestellnummer & Rechnung erhalten\n💬 Persönlicher Support: @' + supportUsername + '\n\nWähle unten eine Funktion:';
   if (messageId) return editMessage(chatId, messageId, text, mainKeyboard());
   return sendMessage(chatId, text, { reply_markup: mainKeyboard() });
 }
@@ -420,25 +241,11 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
-  if (data === 'ai') return sendMessage(chatId, '🤖 KI-ASSISTENT\n\nSchreibe deine Frage direkt hier in den Chat oder nutze /ai gefolgt von deiner Frage.\n\nBeispiele:\n• Wie bestelle ich?\n• Wo ist meine Rechnung?\n• Wie funktioniert der Warenkorb?', { reply_markup: mainKeyboard() });
-  if (data === 'checkout') {
+ {
     if (!cartItems(chatId).length) return showCart(chatId, messageId);
     return showPaymentScreen(chatId);
   }
-  if (data === 'pay:btc' || data === 'pay:sol' || data === 'pay:bnb') {
-    const coin = data === 'pay:btc' ? 'BTC' : data === 'pay:sol' ? 'SOL' : 'BNB';
-    try {
-      const result = await createCryptoPayment(chatId, coin);
-      if (!result.ok) return sendMessage(chatId, '⚠️ ' + result.description, { reply_markup: cryptoPaymentKeyboard() });
-      const p = result.intent;
-      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=' + encodeURIComponent(p.wallet);
-      const paymentCaption = '💳 ' + coin + '-ZAHLUNG\n\n🔢 Bestellung: ' + p.orderNumber + '\n💶 Warenwert: ' + formatMoney(p.eurTotal) + '\n\n📤 EXAKT SENDEN:\n' + p.cryptoAmount + ' ' + coin + '\n\n📍 WALLET:\n' + p.wallet + '\n\n⚠️ Nur das angegebene Netzwerk verwenden.\n\nDer Shop überwacht den Zahlungseingang. Nach Erkennung prüft und bestätigt der Administrator die Zahlung. Danach wird die Rechnung mit dem Status BEZAHLT gesendet.';
-      return sendPhoto(chatId, qrUrl, paymentCaption, { reply_markup: cryptoPaymentKeyboard() });
-    } catch (err) {
-      return sendMessage(chatId, '⚠️ Zahlung konnte nicht vorbereitet werden: ' + (err.message || 'unbekannter Fehler'), { reply_markup: cryptoPaymentKeyboard() });
-    }
-  }
-  if (data.startsWith('add:')) {
+ {
     const [, productId, qtyText] = data.split(':');
     const qty = Number(qtyText);
     if (addToCart(chatId, productId, qty)) {
@@ -446,18 +253,7 @@ async function handleCallback(q) {
     }
     return showProduct(chatId, messageId);
   }
-  if (data.startsWith('admin:confirm-paid:')) {
-    if (!adminChatIds.has(String(chatId))) return sendMessage(chatId, '⛔ Nur der Shop-Administrator darf Zahlungen bestätigen.');
-    const orderNumber = data.slice('admin:confirm-paid:'.length);
-    const order = getOrder(orderNumber);
-    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
-    if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, 'ℹ️ Diese Bestellung ist bereits als BEZAHLT bestätigt.', { reply_markup: orderKeyboard(order) });
-    const intent = cryptoPayments.get(orderNumber);
-    if (!intent || intent.status !== 'ZAHLUNG_ERKANNT') return sendMessage(chatId, '⚠️ Für diese Bestellung wurde noch kein bestätigter Zahlungseingang erkannt. Prüfe zuerst den Zahlungseingang.', { reply_markup: orderKeyboard(order) });
-    const ok = await confirmOrderPaid(orderNumber, { coin:intent.coin, txid:intent.txid });
-    return sendMessage(chatId, ok ? '✅ Zahlung bestätigt. Die Rechnung wurde jetzt an den Kunden gesendet.' : '⚠️ Zahlung konnte nicht bestätigt werden.', { reply_markup: orderKeyboard(order) });
-  }
-  if (data.startsWith('invoice:')) {
+ {
     const order = getOrder(data.slice(8));
     if (order && order.paymentStatus !== 'BEZAHLT' && adminChatIds.has(String(chatId))) return sendMessage(chatId, invoiceText(order), { reply_markup: orderKeyboard(order) });
     if (order && order.paymentStatus !== 'BEZAHLT') return sendMessage(chatId, '🧾 Die Rechnung wird nach Administrator-Bestätigung der Zahlung freigegeben.', { reply_markup: orderKeyboard(order) });
@@ -493,8 +289,7 @@ async function handleUpdate(update) {
     return showHome(chatId);
   }
   if (command === '/myid') return sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`, { reply_markup: mainKeyboard() });
-  if (command === '/ai') { const prompt = parts.slice(1).join(' ').trim(); if (!prompt) return sendMessage(chatId, '🤖 Schreibe z. B. /ai Wie kann ich bestellen?', { reply_markup: mainKeyboard() }); const ai = await openaiReply(chatId, prompt); return sendMessage(chatId, ai || '⚠️ KI ist momentan nicht konfiguriert. Bitte versuche es später erneut.', { reply_markup: mainKeyboard() }); }
-  if (command === '/shop') return showProducts(chatId);
+ return showProducts(chatId);
   if (command === '/support') return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
   if (command === '/order') {
     const order = getOrder(parts[1]);
@@ -505,29 +300,12 @@ async function handleUpdate(update) {
     const order = getOrder(parts[1] || session.lastOrder);
     return sendMessage(chatId, order ? invoiceText(order) : 'Keine Bestellung gefunden.', { reply_markup: orderKeyboard(order) });
   }
-  if (command === '/paid' || command === '/unpaid') {
-    if (!adminChatIds.has(String(chatId))) return sendMessage(chatId, 'Dieser Befehl ist nur für den Shop-Administrator verfügbar.', { reply_markup: mainKeyboard() });
-    const order = getOrder(parts[1]);
-    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.', { reply_markup: mainKeyboard() });
-    if (command === '/unpaid') {
-      order.paymentStatus = 'UNBEZAHLT';
-      const intent = cryptoPayments.get(order.orderNumber);
-      if (intent) intent.status = 'UNBEZAHLT';
-      return sendMessage(chatId, `↩️ ${order.orderNumber}: UNBEZAHLT`, { reply_markup: orderKeyboard(order) });
-    }
-    const intent = cryptoPayments.get(order.orderNumber);
-    if (!intent?.txid) return sendMessage(chatId, '⚠️ Noch kein erkannter Zahlungseingang vorhanden. Nutze /paid erst nach Prüfung des Zahlungseingangs.', { reply_markup: orderKeyboard(order) });
-    const ok = await confirmOrderPaid(order.orderNumber, { coin:intent.coin, txid:intent.txid });
-    return sendMessage(chatId, ok ? `✅ Zahlung bestätigt: ${order.orderNumber}. Die Rechnung wurde an den Kunden gesendet.` : '⚠️ Zahlung konnte nicht bestätigt werden.', { reply_markup: orderKeyboard(order) });
-  }
-  if (/^(test|hallo|hi|hey)$/i.test(text)) return showHome(chatId);
+ return showHome(chatId);
   if (/warenkorb|cart/i.test(text)) return showCart(chatId);
   if (/produkte|produkt|sim/i.test(text)) return showProducts(chatId);
   if (/bestellung|order/i.test(text)) return showOrders(chatId);
   if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
-  const ai = await openaiReply(chatId, text);
-  if (ai) return sendMessage(chatId, ai, { reply_markup: mainKeyboard() });
-  return sendMessage(chatId, '🤖 Ich habe dich verstanden. Nutze die Schaltflächen unten, um den Shop zu öffnen.', { reply_markup: mainKeyboard() });
+
 }
 
 async function configure(baseUrl = publicBaseUrl) {
@@ -556,7 +334,7 @@ async function configure(baseUrl = publicBaseUrl) {
 }
 
 module.exports = {
-  enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername, wallets,
+  enabled: Boolean(token), tokenConfigured: Boolean(token), username: botUsername,
   sendOrder, handleUpdate, configure, getOrder, getOrders: () => Array.from(orders.values()),
   getBalances: () => ({ BTC: 'n/a', SOL: 'n/a', BNB: 'n/a' }),
   getPendingCryptoPayments, markPaymentDetected, markOrderPaid, confirmOrderPaid, getCryptoPriceEur,
