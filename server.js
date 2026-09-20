@@ -77,46 +77,8 @@ async function telegramApi(method, body = {}) {
   }
 }
 
-const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
-const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6').trim();
-const webAiSessions = new Map();
-
-async function webAiReply(sessionId, userText) {
-  if (!openaiApiKey) return { ok:false, error:'KI ist derzeit nicht konfiguriert.' };
-  const id = String(sessionId || 'web').slice(0,120);
-  if (!webAiSessions.has(id)) webAiSessions.set(id, []);
-  const history = webAiSessions.get(id);
-  history.push({ role:'user', content:String(userText || '').slice(0,8000) });
-  const input = history.slice(-12);
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method:'POST',
-      headers:{'content-type':'application/json','authorization':`Bearer ${openaiApiKey}`},
-      body:JSON.stringify({
-        model:openaiModel,
-        instructions:'Du bist der KI-Assistent des Lyca Webshops. Antworte auf Deutsch, freundlich und präzise. Hilf bei Produkten, Bestellung, Rechnung, Warenkorb und allgemeinem Support. Erfinde keine Bestell-, Zahlungs- oder Kontodaten. Für konkrete Bestellungen benötigst du die Bestellnummer. Verweise bei menschlichem Support auf @Lyca_Support.',
-        input,
-        max_output_tokens:700
-      })
-    });
-    const data=await response.json();
-    if (!response.ok) {
-      console.error('Web AI error:', data?.error?.message || `HTTP ${response.status}`);
-      return {ok:false,error:'Der KI-Assistent ist momentan nicht erreichbar.'};
-    }
-    const answer=String(data.output_text || '').trim();
-    if (!answer) return {ok:false,error:'Keine KI-Antwort erhalten.'};
-    history.push({role:'assistant',content:answer});
-    if (history.length>20) history.splice(0,history.length-20);
-    return {ok:true,answer};
-  } catch(err) {
-    console.error('Web AI request failed:',err.message || err);
-    return {ok:false,error:'Der KI-Assistent ist momentan nicht erreichbar.'};
-  }
-}
-
-const BOT_DESCRIPTION = 'Willkommen im Lyca Webshop! 🛍️ Lyca Mobile Triple-SIM bequem online bestellen. Warenkorb, Bestellung und Rechnung direkt über Telegram. Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB – je nach freigeschalteter Zahlungsoption. Support: @' + SUPPORT_USERNAME;
-const BOT_SHORT_DESCRIPTION = 'Lyca Webshop 🛍️ Triple-SIM · Bestellung · Rechnung · BTC · SOL · BNB';
+ = 'Willkommen im Lyca Webshop! 🛍️ Lyca Mobile Triple-SIM bequem online bestellen. Warenkorb, Bestellung und Rechnung direkt über Telegram. Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB – je nach freigeschalteter Zahlungsoption. Support: @' + SUPPORT_USERNAME;
+const BOT_SHORT_DESCRIPTION = 'Lyca Webshop 🛍️ Triple-SIM · Bestellung · Rechnung';
 const BOT_COMMANDS = [
   { command:'start', description:'Lyca Webshop starten' },
   { command:'products', description:'Produkte und Preise anzeigen' },
@@ -124,9 +86,8 @@ const BOT_COMMANDS = [
   { command:'orders', description:'Bestellungen anzeigen' },
   { command:'shop', description:'Webshop öffnen' },
   { command:'support', description:'Support kontaktieren' },
-  { command:'payment', description:'Zahlungsarten anzeigen' },
   { command:'cancel', description:'Vorgang abbrechen' },
-  { command:'ai', description:'KI-Assistent fragen' }
+  { command:'cancel', description:'Vorgang abbrechen' }
 ];
 
 async function configureTelegramProfile() {
@@ -228,8 +189,7 @@ async function telegramStatus(req,res) {
     shop_url:PUBLIC_BASE_URL,
     support_username:SUPPORT_USERNAME,
     support_url:SUPPORT_URL,
-    payment_modes:['Bitcoin (BTC)','Solana (SOL)','BNB'],
-    invitation:`👋 Willkommen im Lyca Webshop!\n\n🛍️ Lyca Mobile Triple-SIM online bestellen.\n📦 Produkte · Warenkorb · Bestellung · Rechnung\n💳 Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB.\n\n🔗 ${BOT_INVITE_URL}`
+`👋 Willkommen im Lyca Webshop!\n\n🛍️ Lyca Mobile Triple-SIM online bestellen.\n📦 Produkte · Warenkorb · Bestellung · Rechnung\n💳 Zahlungsarten: Bitcoin (BTC), Solana (SOL) und BNB.\n\n🔗 ${BOT_INVITE_URL}`
   });
 }
 
@@ -242,8 +202,7 @@ async function telegramInvite(req,res) {
     authenticated:diagnostics.authenticated,
     description:BOT_DESCRIPTION,
     short_description:BOT_SHORT_DESCRIPTION,
-    payment_modes:['Bitcoin (BTC)','Solana (SOL)','BNB'],
-    message:`👋 LYCA WEBSHOP\n\nWillkommen! 🛍️\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\n\n📱 Standard · Micro · Nano\n📦 Mengenpreise im Shop\n🧾 Bestellung & Rechnung\n💳 Zahlung: Bitcoin (BTC), Solana (SOL) und BNB\n❓ Support: @${SUPPORT_USERNAME}\n\n👉 Bot öffnen: ${BOT_INVITE_URL}`
+`👋 LYCA WEBSHOP\n\nWillkommen! 🛍️\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\n\n📱 Standard · Micro · Nano\n📦 Mengenpreise im Shop\n🧾 Bestellung & Rechnung\n💳 Zahlung: Bitcoin (BTC), Solana (SOL) und BNB\n❓ Support: @${SUPPORT_USERNAME}\n\n👉 Bot öffnen: ${BOT_INVITE_URL}`
   });
 }
 
@@ -313,135 +272,12 @@ const server = http.createServer(async (req,res) => {
   }
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
-  if (req.method === 'POST' && route === '/api/chat') {
-    try { const data=await parseJson(req); const message=String(data.message || '').trim(); if(!message) return sendJson(res,400,{ok:false,error:'Bitte eine Nachricht eingeben.'}); const result=await webAiReply(data.session_id,message); return sendJson(res,result.ok?200:503,result); }
-    catch(err){ return sendJson(res,400,{ok:false,error:err.message || 'Chat-Anfrage ungültig.'}); }
-  }
 
-  let filePath;
   try { filePath = safePath(req.url || '/'); } catch { res.writeHead(400); return res.end('Bad Request'); }
   if (!filePath) { res.writeHead(403); return res.end('Forbidden'); }
   fs.stat(filePath,(statErr,stat)=>{ if (!statErr && stat.isFile()) return sendFile(filePath,res); sendFile(path.join(root,'index.html'),res); });
 });
 function sendFile(filePath,res){ fs.readFile(filePath,(err,data)=>{ if(err){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Not Found');} const ext=path.extname(filePath).toLowerCase(); res.writeHead(200,{'Content-Type':mimeTypes[ext]||'application/octet-stream','Cache-Control':ext==='.html'?'no-cache':'public, max-age=3600'}); res.end(data); }); }
 
-
-const PAYMENT_MONITOR_INTERVAL_MS = 30000;
-let lastBscBlock = null;
-
-async function fetchJson(url, options = {}) {
-  const r = await fetch(url, options);
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.message || data?.error || `HTTP ${r.status}`);
-  return data;
-}
-function sameOrGreater(actual, expected) {
-  return Number.isFinite(actual) && Number.isFinite(expected) && actual + 1e-12 >= expected;
-}
-
-async function scanBitcoinPayments(pending) {
-  const intents = pending.filter(p => p.coin === 'BTC');
-  if (!intents.length) return;
-  try {
-    const txs = await fetchJson(`https://mempool.space/api/address/${encodeURIComponent(telegram.wallets.BTC)}/txs`);
-    for (const intent of intents) {
-      const candidates = txs.filter(tx => {
-        const blockTime = Number(tx?.status?.block_time || 0) * 1000;
-        if (!blockTime || blockTime + 120000 < intent.createdAt) return false;
-        const received = (tx.vout || []).filter(v => v.scriptpubkey_address === telegram.wallets.BTC).reduce((sum,v) => sum + Number(v.value || 0), 0) / 1e8;
-        return Boolean(tx?.status?.confirmed) && sameOrGreater(received, intent.cryptoAmount);
-      });
-      if (candidates.length) {
-        await telegram.markPaymentDetected(intent.orderNumber, { coin:'BTC', txid:candidates[0].txid });
-      }
-    }
-  } catch (err) { console.error('BTC payment monitor:', err.message || err); }
-}
-
-async function solanaRpc(method, params) {
-  return fetchJson('https://api.mainnet.solana.com', {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
-  });
-}
-async function scanSolanaPayments(pending) {
-  const intents = pending.filter(p => p.coin === 'SOL');
-  if (!intents.length) return;
-  try {
-    const sigData = await solanaRpc('getSignaturesForAddress', [telegram.wallets.SOL, {limit:20, commitment:'finalized'}]);
-    for (const sig of sigData?.result || []) {
-      if (sig.err) continue;
-      const blockTime = Number(sig.blockTime || 0) * 1000;
-      if (!blockTime) continue;
-      for (const intent of intents) {
-        if (blockTime + 120000 < intent.createdAt) continue;
-        const txData = await solanaRpc('getTransaction', [sig.signature, {commitment:'finalized',maxSupportedTransactionVersion:1,encoding:'jsonParsed'}]);
-        const tx = txData?.result;
-        if (!tx?.meta?.preBalances || !tx?.meta?.postBalances) continue;
-        const keys = tx.transaction?.message?.accountKeys || [];
-        const index = keys.findIndex(k => (typeof k === 'string' ? k : k.pubkey) === telegram.wallets.SOL);
-        if (index < 0) continue;
-        const received = (Number(tx.meta.postBalances[index]) - Number(tx.meta.preBalances[index])) / 1e9;
-        if (sameOrGreater(received, intent.cryptoAmount)) {
-          await telegram.markPaymentDetected(intent.orderNumber, { coin:'SOL', txid:sig.signature });
-        }
-      }
-    }
-  } catch (err) { console.error('SOL payment monitor:', err.message || err); }
-}
-
-async function bscRpc(method, params) {
-  const r = await fetchJson('https://bsc-dataseed.bnbchain.org', {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
-  });
-  if (r.error) throw new Error(r.error.message || 'BSC RPC error');
-  return r;
-}
-async function scanBnbPayments(pending) {
-  const intents = pending.filter(p => p.coin === 'BNB');
-  if (!intents.length) return;
-  try {
-    const latestHex = (await bscRpc('eth_blockNumber', [])).result;
-    const latest = parseInt(latestHex,16);
-    if (!Number.isFinite(latest)) return;
-    if (lastBscBlock === null) { lastBscBlock = latest; return; }
-    const from = Math.max(lastBscBlock + 1, latest - 5);
-    for (let n = from; n <= latest; n++) {
-      const block = (await bscRpc('eth_getBlockByNumber', ['0x' + n.toString(16), true])).result;
-      if (!block) continue;
-      const blockTime = parseInt(block.timestamp,16) * 1000;
-      for (const tx of block.transactions || []) {
-        if (String(tx.to || '').toLowerCase() !== telegram.wallets.BNB.toLowerCase()) continue;
-        const received = Number(BigInt(tx.value || '0x0')) / 1e18;
-        if (!(received > 0)) continue;
-        for (const intent of intents) {
-          if (blockTime + 120000 < intent.createdAt) continue;
-          if (sameOrGreater(received, intent.cryptoAmount)) {
-            await telegram.markPaymentDetected(intent.orderNumber, { coin:'BNB', txid:tx.hash });
-          }
-        }
-      }
-    }
-    lastBscBlock = latest;
-  } catch (err) { console.error('BNB payment monitor:', err.message || err); }
-}
-
-let paymentMonitorRunning = false;
-async function monitorCryptoPayments() {
-  if (paymentMonitorRunning) return;
-  paymentMonitorRunning = true;
-  try {
-    const pending = telegram.getPendingCryptoPayments();
-    if (!pending.length) return;
-    await Promise.all([scanBitcoinPayments(pending), scanSolanaPayments(pending), scanBnbPayments(pending)]);
-  } finally {
-    paymentMonitorRunning = false;
-  }
-}
-setInterval(monitorCryptoPayments, PAYMENT_MONITOR_INTERVAL_MS);
-setTimeout(monitorCryptoPayments, 8000);
 
 server.listen(port,'0.0.0.0',()=>{ console.log(`Lyca Webshop server listening on port ${port}`); setupTelegram(); });
