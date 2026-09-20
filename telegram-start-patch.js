@@ -14,18 +14,20 @@ if (start < 0 || end < 0) {
 }
 
 const replacement = `if (command === '/start') {
-    const order = getOrder(parts[1]);
-    session.lastOrder = order?.orderNumber || session.lastOrder || null;
+    const deepLinkedOrder = getOrder(parts[1]);
+    const latestOrder = deepLinkedOrder || Array.from(orders.values())
+      .filter(o => String(o.telegramChatId || '') === String(chatId))
+      .sort((a,b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+    session.lastOrder = latestOrder?.orderNumber || session.lastOrder || null;
 
     // Register the dedicated @Lyca_Support account as an administrator.
-    // Telegram bots cannot send to a username directly; they need the chat ID.
     if (isSupportAdmin) adminChatIds.add(String(chatId));
 
-    // A webshop deep-link must open the actual order immediately in the bot chat.
-    if (order) {
-      return sendMessage(chatId, 
-        \`🛍️ LYCA WEBSHOP · BESTELLUNG\n\n\${formatOrder(order)}\n\n🧾 Die vollständige Rechnung ist hier im Bot verfügbar.\n\n📋 /orders = letzte Bestellung\n🧾 /invoice = Rechnung\n💬 /support = Support\`,
-        { reply_markup: orderKeyboard(order) }
+    // Open the actual order in the bot when a valid deep-link is used.
+    if (latestOrder) {
+      return sendMessage(chatId,
+        \`🛍️ LYCA WEBSHOP · BESTELLUNG\\n\\n\${formatOrder(latestOrder)}\\n\\n🧾 Die vollständige Rechnung / Bestellbestätigung ist hier im Bot verfügbar.\\n\\n📋 /order = Bestellung\\n🧾 /invoice = Rechnung\\n💬 /support = Support\`,
+        { reply_markup: orderKeyboard(latestOrder) }
       );
     }
 
