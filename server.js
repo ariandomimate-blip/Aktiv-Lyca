@@ -162,7 +162,7 @@ async function telegramOrder(req,res) {
       order_number:orderNumber,
       invoice_number:invoiceNumber,
       payment_status:order.paymentStatus,
-      bot_username:telegram.username,
+      bot_username:telegram.getUsername ? telegram.getUsername() : telegram.username,
       bot_mode:telegram.tokenConfigured ? 'telegram-api' : 'token-missing',
       admin_recipients:result.adminRecipients,
       bot_message:result.message,
@@ -217,12 +217,12 @@ async function telegramInvite(req,res) {
   const d = await telegramDiagnostics();
   return sendJson(res,d.authenticated?200:503,{
     ok:d.authenticated,
-    bot_username:telegram.username,
+    bot_username:telegram.getUsername ? telegram.getUsername() : telegram.username,
     invite_url:BOT_INVITE_URL(),
     authenticated:d.authenticated,
     description:BOT_DESCRIPTION,
     short_description:BOT_SHORT_DESCRIPTION,
-    message:`👋 LYCA WEBSHOP\\n\\nWillkommen! 🛍️\\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\\n\\n📱 Standard · Micro · Nano\\n📦 Mengenpreise im Shop\\n🧾 Bestellung & Rechnung\\n❓ Support: @${SUPPORT_USERNAME}\\n\\n👉 Bot öffnen: ${BOT_INVITE_URL}`
+    message:`👋 LYCA WEBSHOP\\n\\nWillkommen! 🛍️\\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\\n\\n📱 Standard · Micro · Nano\\n📦 Mengenpreise im Shop\\n🧾 Bestellung & Rechnung\\n❓ Support: @${SUPPORT_USERNAME}\\n\\n👉 Bot öffnen: ${BOT_INVITE_URL()}`
   });
 }
 
@@ -235,7 +235,7 @@ async function setupTelegram() {
     console.log('Telegram diagnostics:',{
       authenticated:diagnostics.authenticated,
       canConnectToBusiness:diagnostics.can_connect_to_business,
-      botUsername:diagnostics.bot?.username || telegram.username,
+      botUsername:diagnostics.bot?.username || (telegram.getUsername ? telegram.getUsername() : telegram.username),
       webhookUrl:diagnostics.webhook?.url || ''
     });
   } catch (err) {
@@ -252,7 +252,7 @@ const server = http.createServer(async (req,res) => {
     const ready = Boolean(diagnostics.can_connect_to_business);
     return sendJson(res,200,{
       ok:true,
-      bot_username:telegram.username,
+      bot_username:telegram.getUsername ? telegram.getUsername() : telegram.username,
       business_ready:ready,
       can_connect_to_business:ready,
       authenticated:diagnostics.authenticated,
