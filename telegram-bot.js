@@ -5,7 +5,7 @@ const token = String(
   process.env.BOT_TOKEN ||
   ''
 ).trim();
-let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_webshop2_bot').replace(/^@/, '');
+let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop1_Bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
