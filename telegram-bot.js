@@ -54,9 +54,9 @@ function callback(text, data) { return { text, callback_data: data }; }
 function mainKeyboard() {
   return { inline_keyboard: [
     [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
-    [callback('📋 Bestellung', 'orders')],
+    [callback('📋 Bestellung', 'orders'), callback('💳 Wallets', 'wallets')],
     [webAppButton()],
-    [urlButton('❓ Support', `https://t.me/${supportUsername}`)]
+    [urlButton('🤖 Bot öffnen', botOrderUrl('')), urlButton('❓ Support', `https://t.me/${supportUsername}`)]
   ] };
 }
 function productKeyboard() {
@@ -289,7 +289,11 @@ async function handleUpdate(update) {
   const session = getSession(chatId);
 
   if (command === '/start') {
-    const order = getOrder(parts[1]);
+    const startParam = String(parts[1] || '').trim();
+    if (startParam.toLowerCase() === 'wallets') {
+      return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
+    }
+    const order = getOrder(startParam);
     session.lastOrder = order?.orderNumber || session.lastOrder || null;
     if (isSupportAdmin) return sendMessage(chatId, '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden an die konfigurierten Administratoren gesendet.\n\n🆔 Deine Chat-ID: ' + chatId, { reply_markup: mainKeyboard() });
     if (order) {
