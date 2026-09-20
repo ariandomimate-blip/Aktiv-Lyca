@@ -7,8 +7,17 @@ function add(id,qty=1){const found=state.items.find(x=>x.id===id);if(found)found
 function renderCart(){const count=state.items.reduce((s,x)=>s+x.qty,0);$('#cartCount').textContent=count;$('#cartItems').innerHTML=state.items.length?state.items.map(x=>{const unit=unitPrice(x.qty);return `<div class="cart-row"><div><strong>${x.brand}</strong><br><small>${x.name} · ${x.qty} Stück</small></div><div><strong>${euro(unit*x.qty)}</strong><br><small>${euro(unit)} / Stück</small></div></div>`}).join(''):'<div class="empty">Dein Warenkorb ist leer.</div>';$('#cartTotal').textContent=euro(state.items.reduce((s,x)=>s+unitPrice(x.qty)*x.qty,0))}
 function openCart(){$('#cartDrawer').classList.add('open');$('#cartDrawer').setAttribute('aria-hidden','false');$('#backdrop').classList.add('show')}
 function closeAll(){$('#cartDrawer').classList.remove('open');$('#cartDrawer').setAttribute('aria-hidden','true');$('#backdrop').classList.remove('show');$('#checkoutModal').classList.remove('show')}
-const TELEGRAM_BOT_USERNAME='Lyca_Webshop1_Bot';
+let TELEGRAM_BOT_USERNAME='Lyca_Webshop1_Bot';
 const TELEGRAM_BOT_ID='8941978091';
+async function resolveTelegramBotUsername(){
+  try{
+    const r=await fetch('/api/telegram-status',{cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    const username=String(data?.bot_username||'').replace(/^@/,'').trim();
+    if(username)TELEGRAM_BOT_USERNAME=username;
+  }catch{}
+}
 function telegramBotUrl(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'https://t.me/'+TELEGRAM_BOT_USERNAME+'?start='+param}
 function telegramBotUri(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'tg://resolve?domain='+TELEGRAM_BOT_USERNAME+'&start='+param}
 function openTelegramSupport(url,tgUrl){if(!url)return;
@@ -35,6 +44,7 @@ $('#checkoutForm').onsubmit=async e=>{
     const r=await fetch('/api/telegram-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,payment_status:'UNBEZAHLT',telegram_chat_id:telegramChatId})});
     const data=await r.json();if(!r.ok)throw new Error(data.error||'Bestellung konnte nicht vorbereitet werden.');
     const orderNumber=String(data.order_number||'');
+    await resolveTelegramBotUsername();
     const botUrl=telegramBotUrl(orderNumber);
     const botUri=telegramBotUri(orderNumber);
     const invoiceText=String(data.invoice||'');
