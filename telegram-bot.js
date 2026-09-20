@@ -292,6 +292,13 @@ async function handleUpdate(update) {
     const order = getOrder(parts[1]);
     session.lastOrder = order?.orderNumber || session.lastOrder || null;
     if (isSupportAdmin) return sendMessage(chatId, '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden an die konfigurierten Administratoren gesendet.\n\n🆔 Deine Chat-ID: ' + chatId, { reply_markup: mainKeyboard() });
+    if (order) {
+      return sendMessage(
+        chatId,
+        '✅ BESTELLUNG ERKANNT\n\n' + formatOrder(order) + '\n\n🧾 Deine Rechnung / Bestellbestätigung kannst du über den Button öffnen.',
+        { reply_markup: orderKeyboard(order) }
+      );
+    }
     return showHome(chatId);
   }
   if (command === '/myid') return sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`, { reply_markup: mainKeyboard() });
@@ -341,6 +348,7 @@ async function configure(baseUrl = publicBaseUrl) {
 
 module.exports = {
   enabled: Boolean(token),
+  getUsername: () => botUsername,
   tokenConfigured: Boolean(token),
   username: botUsername,
   sendOrder,
