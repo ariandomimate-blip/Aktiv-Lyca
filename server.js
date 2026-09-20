@@ -78,7 +78,7 @@ async function telegramApi(method, body = {}) {
 }
 
 const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
-const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
+const openaiModel = String(process.env.OPENAI_MODEL || 'gpt-5.6').trim();
 const webAiSessions = new Map();
 
 async function webAiReply(sessionId, userText) {
