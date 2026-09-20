@@ -7,7 +7,45 @@ function add(id,qty=1){const found=state.items.find(x=>x.id===id);if(found)found
 function renderCart(){const count=state.items.reduce((s,x)=>s+x.qty,0);$('#cartCount').textContent=count;$('#cartItems').innerHTML=state.items.length?state.items.map(x=>{const unit=unitPrice(x.qty);return `<div class="cart-row"><div><strong>${x.brand}</strong><br><small>${x.name} · ${x.qty} Stück</small></div><div><strong>${euro(unit*x.qty)}</strong><br><small>${euro(unit)} / Stück</small></div></div>`}).join(''):'<div class="empty">Dein Warenkorb ist leer.</div>';$('#cartTotal').textContent=euro(state.items.reduce((s,x)=>s+unitPrice(x.qty)*x.qty,0))}
 function openCart(){$('#cartDrawer').classList.add('open');$('#cartDrawer').setAttribute('aria-hidden','false');$('#backdrop').classList.add('show')}
 function closeAll(){$('#cartDrawer').classList.remove('open');$('#cartDrawer').setAttribute('aria-hidden','true');$('#backdrop').classList.remove('show');$('#checkoutModal').classList.remove('show')}
-function openTelegramSupport(url){if(!url)return;if(window.Telegram?.WebApp?.openTelegramLink){try{window.Telegram.WebApp.openTelegramLink(url);return}catch{}}window.open(url,'_blank','noopener')}
-window.addLycaProduct=qty=>add(1,qty);$('#cartOpen').onclick=openCart;$('#cartClose').onclick=closeAll;$('#backdrop').onclick=closeAll;$('#checkout').onclick=()=>{if(!state.items.length)return alert('Bitte zuerst die SIM-Karte in den Warenkorb legen.');$('#checkoutModal').classList.add('show');$('#backdrop').classList.remove('show')};$('#checkoutClose').onclick=()=>$('#checkoutModal').classList.remove('show');
-$('#checkoutForm').onsubmit=async e=>{e.preventDefault();if(!state.items.length)return;const form=new FormData(e.target);const customer={name:`${form.get('firstName')} ${form.get('lastName')}`.trim(),email:String(form.get('email')||'').trim(),address:String(form.get('address')||'').trim()};const telegramChatId=window.Telegram?.WebApp?.initDataUnsafe?.user?.id?String(window.Telegram.WebApp.initDataUnsafe.user.id):'';const items=state.items.map(x=>({name:`${x.brand} ${x.name}`,qty:x.qty,price:unitPrice(x.qty)}));const btn=e.target.querySelector('button[type="submit"]');btn.disabled=true;btn.textContent='BESTELLUNG WIRD VORBEREITET …';try{const r=await fetch('/api/telegram-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,payment_status:'UNBEZAHLT',telegram_chat_id:telegramChatId})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Bestellung konnte nicht vorbereitet werden.');const invoiceUrl=data.invoice_url||'https://t.me/Lyca_Webshop1_Bot';const botUrl=invoiceUrl||'https://t.me/Lyca_Webshop1_Bot';const invoiceText=String(data.invoice||'');const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');$('#success').hidden=false;$('#success').innerHTML='<div>✓ Bestellung <strong>'+esc(data.order_number)+'</strong> erstellt.</div><br><strong>🧾 Fertige Rechnung / Bestellbestätigung</strong><pre style="white-space:pre-wrap;text-align:left;padding:14px;border:1px solid #ffffff18;border-radius:12px;background:#080c12;color:#dce8e5;margin-top:12px">'+esc(invoiceText)+'</pre><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn primary" id="copyInvoice">🧾 Rechnung kopieren</button><a class="btn primary" href="'+botUrl+'" target="_blank" rel="noopener">🤖 @Lyca_Webshop1_Bot öffnen</a></div><p class="form-note" style="margin-top:12px">Nach der Bestellung wirst du direkt zu @Lyca_Webshop1_Bot weitergeleitet.</p>';const copyBtn=document.getElementById('copyInvoice');if(copyBtn)copyBtn.onclick=async()=>{try{await navigator.clipboard.writeText(invoiceText);copyBtn.textContent='✓ Rechnung kopiert';}catch{alert('Rechnung konnte nicht automatisch kopiert werden.')}};e.target.reset();setTimeout(()=>openTelegramSupport(botUrl),400)}catch(err){alert(err.message)}finally{btn.disabled=false;btn.textContent='Weiter zu Telegram'}};
+const TELEGRAM_BOT_USERNAME='Lyca_Webshop1_Bot';
+const TELEGRAM_BOT_ID='8941978091';
+function telegramBotUrl(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'https://t.me/'+TELEGRAM_BOT_USERNAME+'?start='+param}
+function telegramBotUri(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'tg://resolve?domain='+TELEGRAM_BOT_USERNAME+'&start='+param}
+function openTelegramSupport(url,tgUrl){if(!url)return;
+  if(window.Telegram?.WebApp){
+    try{window.location.href=tgUrl||url;setTimeout(()=>{try{window.location.href=url}catch{}},1200);return}catch{}
+  }
+  const w=window.open(url,'_blank','noopener');if(!w)window.location.href=url;
+}
+window.addLycaProduct=qty=>add(1,qty);
+$('#cartOpen').onclick=openCart;
+$('#cartClose').onclick=closeAll;
+$('#backdrop').onclick=closeAll;
+$('#checkout').onclick=()=>{if(!state.items.length)return alert('Bitte zuerst die SIM-Karte in den Warenkorb legen.');$('#checkoutModal').classList.add('show');$('#backdrop').classList.remove('show')};
+$('#checkoutClose').onclick=()=>$('#checkoutModal').classList.remove('show');
+
+$('#checkoutForm').onsubmit=async e=>{
+  e.preventDefault();if(!state.items.length)return;
+  const form=new FormData(e.target);
+  const customer={name:`${form.get('firstName')} ${form.get('lastName')}`.trim(),email:String(form.get('email')||'').trim(),address:String(form.get('address')||'').trim()};
+  const telegramChatId=window.Telegram?.WebApp?.initDataUnsafe?.user?.id?String(window.Telegram.WebApp.initDataUnsafe.user.id):'';
+  const items=state.items.map(x=>({name:`${x.brand} ${x.name}`,qty:x.qty,price:unitPrice(x.qty)}));
+  const btn=e.target.querySelector('button[type="submit"]');btn.disabled=true;btn.textContent='BESTELLUNG WIRD VORBEREITET …';
+  try{
+    const r=await fetch('/api/telegram-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,payment_status:'UNBEZAHLT',telegram_chat_id:telegramChatId})});
+    const data=await r.json();if(!r.ok)throw new Error(data.error||'Bestellung konnte nicht vorbereitet werden.');
+    const orderNumber=String(data.order_number||'');
+    const botUrl=telegramBotUrl(orderNumber);
+    const botUri=telegramBotUri(orderNumber);
+    const invoiceText=String(data.invoice||'');
+    const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    $('#success').hidden=false;
+    $('#success').innerHTML='<div>✓ Bestellung <strong>'+esc(orderNumber)+'</strong> erstellt.</div><br><strong>🧾 Fertige Rechnung / Bestellbestätigung</strong><pre style="white-space:pre-wrap;text-align:left;padding:14px;border:1px solid #ffffff18;border-radius:12px;background:#080c12;color:#dce8e5;margin-top:12px">'+esc(invoiceText)+'</pre><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn primary" id="copyInvoice">🧾 Rechnung kopieren</button><a class="btn primary" href="'+botUrl+'" target="_blank" rel="noopener">🤖 @Lyca_Webshop1_Bot öffnen</a><a class="btn primary" href="'+botUri+'">📲 Telegram direkt öffnen</a></div><p class="form-note" style="margin-top:12px">Nach der Bestellung wirst du direkt zu @Lyca_Webshop1_Bot weitergeleitet. Falls Telegram den Link nicht automatisch öffnet, tippe auf „Telegram direkt öffnen“.</p>';
+    const copyBtn=document.getElementById('copyInvoice');
+    if(copyBtn)copyBtn.onclick=async()=>{try{await navigator.clipboard.writeText(invoiceText);copyBtn.textContent='✓ Rechnung kopiert';}catch{alert('Rechnung konnte nicht automatisch kopiert werden.')}};
+    e.target.reset();
+    setTimeout(()=>openTelegramSupport(botUrl,botUri),250);
+  }catch(err){alert(err.message)}
+  finally{btn.disabled=false;btn.textContent='Weiter zu Telegram'}
+};
 const aiForm=document.getElementById('aiForm');const aiInput=document.getElementById('aiInput');const aiMessages=document.getElementById('aiMessages');const aiSessionId=(()=>{let k='lyca_ai_session';try{let v=sessionStorage.getItem(k);if(!v){v=crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random();sessionStorage.setItem(k,v)}return v}catch{return 'web-'+Date.now()}})();function addAiMessage(text,role){const d=document.createElement('div');d.className='ai-msg '+role;d.textContent=text;aiMessages.appendChild(d);aiMessages.scrollTop=aiMessages.scrollHeight}if(aiForm)aiForm.onsubmit=async e=>{e.preventDefault();const message=String(aiInput.value||'').trim();if(!message)return;addAiMessage(message,'user');aiInput.value='';const btn=aiForm.querySelector('button');btn.disabled=true;btn.textContent='…';try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:aiSessionId,message})});const data=await r.json();addAiMessage(data.answer||data.error||'Keine Antwort erhalten.','bot')}catch(err){addAiMessage('Der KI-Assistent ist momentan nicht erreichbar. Bitte versuche es später erneut.','bot')}finally{btn.disabled=false;btn.textContent='Senden'}};renderProducts();renderCart();document.querySelectorAll('.wallet-copy').forEach(btn=>btn.addEventListener('click',async()=>{const el=document.getElementById(btn.dataset.wallet);if(!el)return;const value=el.textContent.trim();try{await navigator.clipboard.writeText(value);const old=btn.textContent;btn.textContent='✓ Kopiert';setTimeout(()=>btn.textContent=old,1400)}catch{alert('Adresse: '+value)}}));
