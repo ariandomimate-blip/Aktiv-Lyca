@@ -13,6 +13,11 @@ const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || proce
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
 if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
+const wallets = {
+  BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
+  SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
+  BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
+};
 
 const orders = new Map();
 const sessions = new Map();
@@ -79,9 +84,25 @@ function cartKeyboard(hasItems) {
   rows.push([webAppButton(), callback('↩️ Start', 'home')]);
   return { inline_keyboard: rows };
 }
+function walletKeyboard() {
+  return { inline_keyboard: [
+    [callback('₿ Bitcoin (BTC)', 'wallet:BTC')],
+    [callback('◎ Solana (SOL)', 'wallet:SOL')],
+    [callback('◆ BNB', 'wallet:BNB')],
+    [callback('↩️ Start', 'home')]
+  ] };
+}
+function walletText(coin) {
+  const address = wallets[coin];
+  const names = { BTC:'Bitcoin (BTC)', SOL:'Solana (SOL)', BNB:'BNB' };
+  return `💳 ZAHLUNGS-WALLET\n\n${names[coin] || coin}\n\n${address}\n\n⚠️ Bitte ausschließlich die angegebene Kryptowährung an diese Adresse senden. Prüfe die Adresse vor dem Versand.\n\nFür Bestell- und Zahlungsfragen: @${supportUsername}`;
+}
+function walletsText() {
+  return `💳 LYCA WEBSHOP · ZAHLUNGS-WALLETS\n\n₿ Bitcoin (BTC)\n${wallets.BTC}\n\n◎ Solana (SOL)\n${wallets.SOL}\n\n◆ BNB\n${wallets.BNB}\n\n⚠️ Bitte nur die jeweils passende Kryptowährung an die dazugehörige Adresse senden.`;
+}
 function orderKeyboard(order) {
   const rows = [];
-  if (order) rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)], [callback('🛒 Shop öffnen', 'products')]);
+  if (order) rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)], [callback('💳 Wallets', 'wallets')], [callback('🛒 Shop öffnen', 'products')]);
   rows.push([webAppButton(), urlButton('❓ Support', `https://t.me/${supportUsername}`)], [callback('↩️ Start', 'home')]);
   return { inline_keyboard: rows };
 }
@@ -225,6 +246,12 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
+  if (data === 'wallets') return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
+  if (data.startsWith('wallet:')) {
+    const coin = data.split(':')[1];
+    if (!wallets[coin]) return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
+    return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
+  }
   if (data === 'checkout') return sendMessage(chatId, '🧾 Bitte öffne den Lyca-Webshop, um die Bestellung mit deinen Kontaktdaten abzuschließen.', { reply_markup: { inline_keyboard: [[webAppButton()], [callback('↩️ Start', 'home')]] } });
   if (data.startsWith('add:')) {
     const [, productId, qtyText] = data.split(':');
@@ -305,6 +332,7 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'order', description: 'Bestellung anzeigen' },
     { command: 'invoice', description: 'Rechnung anzeigen' },
     { command: 'support', description: 'Support kontaktieren' },
+    { command: 'wallets', description: 'Zahlungs-Wallets anzeigen' },
     { command: 'myid', description: 'Telegram Chat-ID anzeigen' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
