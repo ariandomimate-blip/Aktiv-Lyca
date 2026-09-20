@@ -21,14 +21,10 @@ function telegramBotUrl(orderNumber){const param=encodeURIComponent(String(order
 function telegramBotUri(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'tg://resolve?domain='+TELEGRAM_BOT_USERNAME+'&start='+param}
 function openTelegramSupport(url){
   if(!url)return;
-  // Use the normal HTTPS Telegram deep link. The tg:// scheme can trigger
-  // iOS/Safari "Load failed" errors when Telegram is not allowed to handle it.
-  try{
-    const w=window.open(url,'_blank','noopener');
-    if(!w)window.location.href=url;
-  }catch{
-    try{window.location.href=url}catch{}
-  }
+  // Navigate directly to the HTTPS Telegram deep link. This avoids the
+  // iOS/Safari "Load failed" problem from tg:// and popup blocking.
+  try{window.location.assign(url)}
+  catch{try{window.location.href=url}catch{}}
 }
 window.addLycaProduct=qty=>add(1,qty);
 $('#cartOpen').onclick=openCart;
