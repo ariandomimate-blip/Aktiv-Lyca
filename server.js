@@ -28,7 +28,7 @@ const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.RENDER
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
-const BOT_INVITE_URL = `https://t.me/${telegram.username}`;
+const BOT_INVITE_URL = () => `https://t.me/${encodeURIComponent(telegram.getUsername ? telegram.getUsername() : telegram.username)}`;
 const mimeTypes = {
   '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8',
   '.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp',
@@ -112,7 +112,7 @@ async function telegramDiagnostics() {
       isBot:me.result.is_bot, canConnectToBusiness:Boolean(me.result.can_connect_to_business),
       hasMainWebApp:Boolean(me.result.has_main_web_app)
     } : null,
-    expected_bot_username:telegram.username,
+    expected_bot_username:telegram.getUsername ? telegram.getUsername() : telegram.username,
     expected_bot_id:TELEGRAM_BOT_ID || null,
     bot_id_matches_expected:Boolean(me.ok && TELEGRAM_BOT_ID && String(me.result?.id) === TELEGRAM_BOT_ID),
     telegramError:me.ok ? null : (me.description || 'Unauthorized'),
@@ -197,7 +197,7 @@ async function telegramStatus(req,res) {
     ok:true,
     telegram_enabled:d.authenticated,
     bot_enabled:true,
-    bot_username:telegram.username,
+    bot_username:telegram.getUsername ? telegram.getUsername() : telegram.username,
     bot_mode:d.authenticated?'telegram-api':'token-invalid-or-missing',
     token_configured:d.tokenConfigured,
     authenticated:d.authenticated,
@@ -205,11 +205,11 @@ async function telegramStatus(req,res) {
     telegram_error:d.telegramError,
     webhook:d.webhook,
     webhook_url:`${PUBLIC_BASE_URL}/api/telegram-webhook`,
-    invite_url:BOT_INVITE_URL,
+    invite_url:BOT_INVITE_URL(),
     shop_url:PUBLIC_BASE_URL,
     support_username:SUPPORT_USERNAME,
     support_url:SUPPORT_URL,
-    invitation:`👋 Willkommen im Lyca Webshop!\\n\\n🛍️ Lyca Mobile Triple-SIM online bestellen.\\n📦 Produkte · Warenkorb · Bestellung · Rechnung\\n\\n🔗 ${BOT_INVITE_URL}`
+    invitation:`👋 Willkommen im Lyca Webshop!\\n\\n🛍️ Lyca Mobile Triple-SIM online bestellen.\\n📦 Produkte · Warenkorb · Bestellung · Rechnung\\n\\n🔗 ${BOT_INVITE_URL()}`
   });
 }
 
@@ -218,7 +218,7 @@ async function telegramInvite(req,res) {
   return sendJson(res,d.authenticated?200:503,{
     ok:d.authenticated,
     bot_username:telegram.username,
-    invite_url:BOT_INVITE_URL,
+    invite_url:BOT_INVITE_URL(),
     authenticated:d.authenticated,
     description:BOT_DESCRIPTION,
     short_description:BOT_SHORT_DESCRIPTION,
