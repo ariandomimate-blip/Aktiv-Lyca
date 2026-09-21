@@ -72,6 +72,16 @@ function adminOrderKeyboard(order) {
   ] };
 }
 
+function businessKeyboard() {
+  // Telegram Business replies do not accept Web App buttons inside inline keyboards.
+  // Use normal URL buttons here; the regular bot chat keeps the Web App button.
+  return { inline_keyboard: [
+    [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
+    [callback('📋 Bestellung', 'orders'), callback('💳 Wallets', 'wallets')],
+    [urlButton('🛍️ Shop öffnen', publicBaseUrl)],
+    [urlButton('🤖 Bot öffnen', botOrderUrl('')), urlButton('❓ Support', `https://t.me/${supportUsername}`)]
+  ] };
+}
 function mainKeyboard() {
   return { inline_keyboard: [
     [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
@@ -258,7 +268,7 @@ async function handleBusinessMessage(msg) {
   const text = String(msg.text || msg.caption || '').trim();
   if (!text) return;
   const reply = businessReplyText(text);
-  const result = await sendBusinessMessage(connectionId, msg.chat.id, reply, { reply_markup: mainKeyboard() });
+  const result = await sendBusinessMessage(connectionId, msg.chat.id, reply, { reply_markup: businessKeyboard() });
   if (!result.ok) console.error(`Lyca Business reply failed: ${result.description || 'unknown Telegram error'}`);
 }
 
