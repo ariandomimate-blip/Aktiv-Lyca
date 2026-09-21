@@ -24,8 +24,8 @@ process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(
 const telegram = require('./telegram-bot');
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
-// The Render onrender.com subdomain is disabled for this service. Use the connected production domain.
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://lyca-aktiv.de').replace(/\/$/,'');
+// Production webshop domain. Render custom-domain DNS must point aktiv-lyca.de to this service.
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://aktiv-lyca.de').replace(/\/$/,'');
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
