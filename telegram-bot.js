@@ -474,7 +474,9 @@ async function configure(baseUrl = publicBaseUrl) {
   // automatically so new orders reach Support without a manually copied chat ID.
   try {
     const supportChat = await api('getChat', { chat_id: '@' + supportUsername });
-    if (supportChat.ok && supportChat.result?.id != null) {
+    if (supportChat.ok && supportChat.result?.id != null && !adminChatIds.size) {
+      // Fallback only: Support acts as the administrator recipient when no
+      // separate TELEGRAM_ADMIN_CHAT_IDS value has been configured.
       adminChatIds.add(String(supportChat.result.id));
     }
   } catch {}
