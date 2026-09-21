@@ -62,7 +62,7 @@ function qrUrl(value) {
 function paymentKeyboard(order) {
   if (!order) return { inline_keyboard: [] };
   return { inline_keyboard: [
-    [callback('💰 Zahlung getätigt – zur Prüfung', 'paid_notice:' + order.orderNumber)]
+    [callback('💰 Zahlung bestätigen & TX-ID eingeben', 'paid_notice:' + order.orderNumber)]
   ] };
 }
 function adminOrderKeyboard(order) {
@@ -293,7 +293,7 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   if (!order) return false;
   order.paymentStatus = 'BEZAHLT';
   order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
-  const paidText = formatOrder(order) + `\n\n💰 ZAHLUNG BESTÄTIGT\n🕒 Bestätigt: ${order.paidAt}\n\n🧾 RECHNUNG\n${invoiceText(order)}`;
+  const paidText = formatOrder(order) + `\n\n🔗 Transaktions-ID / TXID:\n${order.transactionId || 'nicht angegeben'}\n\n💰 ZAHLUNG BESTÄTIGT\n🕒 Bestätigt: ${order.paidAt}\n\n🧾 RECHNUNG\n${invoiceText(order)}`;
 
   // Entfernt den Bestätigungsbutton beim Administrator nach der Bestätigung.
   if (sourceMessage?.message_id) {
@@ -347,22 +347,18 @@ async function handleCallback(q) {
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
 
-    order.paymentReportedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
-    const recipients = Array.from(adminChatIds);
-    const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG ERFORDERLICH\n\n${formatOrder(order)}\n\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}`;
-    for (const adminId of recipients) {
-      await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
-    }
+    const session = getSession(chatId);
+    session.pendingPaymentOrder = order.orderNumber;
 
-    // Button beim Kunden nach einmaliger Meldung entfernen.
     if (messageId) {
       await editMessage(chatId, messageId,
-        `⏳ ZAHLUNG GEMELDET\n\nBestellung: ${order.orderNumber}\nStatus: UNBEZAHLT – wartet auf Administratorprüfung.\n\nBitte nicht erneut melden.`,
+        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte sende jetzt die vollständige Transaktions-ID / TXID deiner Zahlung als nächste Nachricht.\\n\\n⚠️ Die Zahlung bleibt UNBESTÄTIGT, bis der Administrator die TXID geprüft und bestätigt hat.`,
         { inline_keyboard: [] }
       );
-    }
-    if (!recipients.length) {
-      return sendMessage(chatId, '⚠️ Zahlung wurde gemeldet, aber es ist noch kein Administrator-Chat konfiguriert.');
+    } else {
+      await sendMessage(chatId,
+        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte sende jetzt die vollständige Transaktions-ID / TXID deiner Zahlung als nächste Nachricht.`
+      );
     }
     return;
   }
@@ -415,6 +411,31 @@ async function handleUpdate(update) {
   const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase();
   if (isSupportAdmin) adminChatIds.add(String(chatId));
   const session = getSession(chatId);
+
+  // Customer must provide the transaction ID before the administrator can review the payment.
+  if (session.pendingPaymentOrder && text && !text.startsWith('/')) {
+    const order = getOrder(session.pendingPaymentOrder);
+    if (order && order.paymentStatus !== 'BEZAHLT') {
+      const txid = text.trim();
+      if (txid.length < 6) {
+        return sendMessage(chatId, '⚠️ Die Transaktions-ID ist zu kurz. Bitte sende die vollständige TXID.');
+      }
+      order.transactionId = txid;
+      order.paymentReportedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+      session.pendingPaymentOrder = null;
+
+      const recipients = Array.from(adminChatIds);
+      const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG ERFORDERLICH\\n\\n${formatOrder(order)}\\n\\n🔗 Transaktions-ID / TXID:\\n${order.transactionId}\\n\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}`;
+      for (const adminId of recipients) {
+        await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
+      }
+      if (!recipients.length) {
+        return sendMessage(chatId, '⚠️ TXID gespeichert, aber es ist noch kein Administrator-Chat konfiguriert.');
+      }
+      return sendMessage(chatId, `⏳ ZAHLUNG GEMELDET\\n\\nBestellung: ${order.orderNumber}\\nTXID: ${order.transactionId}\\n\\nDie Zahlung wird jetzt vom Administrator geprüft. Erst nach der manuellen Bestätigung wird die Bestellung als BEZAHLT markiert.`);
+    }
+    session.pendingPaymentOrder = null;
+  }
 
   if (command === '/start') {
     const startParam = String(parts[1] || '').trim();
@@ -474,9 +495,8 @@ async function configure(baseUrl = publicBaseUrl) {
   // automatically so new orders reach Support without a manually copied chat ID.
   try {
     const supportChat = await api('getChat', { chat_id: '@' + supportUsername });
-    if (supportChat.ok && supportChat.result?.id != null && !adminChatIds.size) {
-      // Fallback only: Support acts as the administrator recipient when no
-      // separate TELEGRAM_ADMIN_CHAT_IDS value has been configured.
+    if (supportChat.ok && supportChat.result?.id != null) {
+      // Lyca_Support is the administrator account.
       adminChatIds.add(String(supportChat.result.id));
     }
   } catch {}
