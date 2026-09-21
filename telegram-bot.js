@@ -279,6 +279,11 @@ async function handleUpdate(update) {
 
   const msg = update.message;
   if (!msg || !msg.chat) return;
+  console.log('Lyca Telegram update:', JSON.stringify({
+    update_id: update.update_id,
+    chat_id: msg.chat.id,
+    text: String(msg.text || '').slice(0, 120)
+  }));
   const chatId = msg.chat.id;
   const text = String(msg.text || '').trim();
   const parts = text.split(/\s+/);
@@ -293,14 +298,25 @@ async function handleUpdate(update) {
     if (startParam.toLowerCase() === 'wallets') {
       return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     }
-    const order = getOrder(startParam);
-    session.lastOrder = order?.orderNumber || session.lastOrder || null;
-    if (isSupportAdmin) return sendMessage(chatId, '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden an die konfigurierten Administratoren gesendet.\n\n🆔 Deine Chat-ID: ' + chatId, { reply_markup: mainKeyboard() });
-    if (order) {
+    const deepLinkedOrder = getOrder(startParam);
+    const latestOrder = deepLinkedOrder || Array.from(orders.values())
+      .filter(o => String(o.telegramChatId || '') === String(chatId))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+    session.lastOrder = latestOrder?.orderNumber || session.lastOrder || null;
+    if (isSupportAdmin) adminChatIds.add(String(chatId));
+    if (latestOrder) {
       return sendMessage(
         chatId,
-        '✅ BESTELLUNG ERKANNT\n\n' + formatOrder(order) + '\n\n🧾 Deine Rechnung / Bestellbestätigung kannst du über den Button öffnen.',
-        { reply_markup: orderKeyboard(order) }
+        '🛍️ LYCA WEBSHOP · BESTELLUNG\n\n' + formatOrder(latestOrder) +
+        '\n\n🧾 Die vollständige Rechnung / Bestellbestätigung ist hier im Bot verfügbar.',
+        { reply_markup: orderKeyboard(latestOrder) }
+      );
+    }
+    if (isSupportAdmin) {
+      return sendMessage(
+        chatId,
+        '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden automatisch an die registrierten Administratoren weitergeleitet.\n\n🆔 Deine Chat-ID: ' + chatId,
+        { reply_markup: mainKeyboard() }
       );
     }
     return showHome(chatId);
