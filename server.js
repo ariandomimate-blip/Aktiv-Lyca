@@ -134,6 +134,16 @@ async function telegramOrder(req,res) {
     if (!customer.name || !customer.email || !customer.email.includes('@') || !customer.address || !items.length) {
       return sendJson(res,400,{error:'Bitte Name, E-Mail, Anschrift und Warenkorb angeben.'});
     }
+    // Never create a checkout link from a stale/fallback bot username.
+    // Telegram's getMe() is the source of truth for the bot that owns the token.
+    const diagnostics = await telegramDiagnostics();
+    if (!diagnostics.authenticated || !diagnostics.bot?.username) {
+      return sendJson(res,503,{
+        error:'Telegram-Bot ist auf dem Server nicht authentifiziert. Die Bestellung wurde nicht an einen falschen Bot-Link weitergeleitet.',
+        telegram_error:diagnostics.telegramError || 'Telegram getMe() fehlgeschlagen'
+      });
+    }
+    const verifiedBotUsername = String(diagnostics.bot.username).replace(/^@/,'').trim();
     const orderNumber = makeOrderNumber();
     const invoiceNumber = makeInvoiceNumber(orderNumber);
     const normalizedItems = items.map(x => ({
@@ -158,6 +168,8 @@ async function telegramOrder(req,res) {
     const result = await telegram.sendOrder(order);
     const invoiceText = formatInvoice(order);
     const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
+    // Always build the customer handoff from the username verified by getMe().
+    const verifiedBotUrl = `https://t.me/${verifiedBotUsername}?start=${encodeURIComponent(orderNumber)}`;
     return sendJson(res,201,{
       ok:true,
       order_number:orderNumber,
@@ -168,10 +180,10 @@ async function telegramOrder(req,res) {
       admin_recipients:result.adminRecipients,
       bot_message:result.message,
       invoice:invoiceText,
-      invoice_url:result.invoiceUrl || telegram.botOrderUrl(orderNumber),
+      invoice_url:verifiedBotUrl,
       support_username:SUPPORT_USERNAME,
       support_url:supportUrl,
-      telegram_url:result.invoiceUrl || telegram.botOrderUrl(orderNumber),
+      telegram_url:verifiedBotUrl,
       shop_url:PUBLIC_BASE_URL
     });
   } catch (err) {
