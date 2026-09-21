@@ -39,15 +39,15 @@ const products = {
 function formatMoney(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
 
 function formatOrder(order) {
-  const lines = order.items.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.price)} / Stück`).join('\\n');
-  return `🛒 LYCA WEBSHOP · NEUE BESTELLUNG\\n\\n🔢 Bestellnummer: ${order.orderNumber}\\n🧾 Rechnung: ${order.invoiceNumber}\\n📅 ${order.createdAt}\\n\\n👤 KUNDE\\n${order.customer.name}\\n${order.customer.address}\\n${order.customer.email}\\n\\n📦 BESTELLUNG\\n${lines}\\n\\n💶 Gesamt: ${formatMoney(order.total)}\\n📌 Zahlungsstatus: ${order.paymentStatus}\\n\\n📩 Support: @${supportUsername}`;
+  const lines = order.items.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.price)} / Stück`).join('\n');
+  return `🛒 LYCA WEBSHOP · NEUE BESTELLUNG\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnung: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n👤 KUNDE\n${order.customer.name}\n${order.customer.address}\n${order.customer.email}\n\n📦 BESTELLUNG\n${lines}\n\n💶 Gesamt: ${formatMoney(order.total)}\n📌 Zahlungsstatus: ${order.paymentStatus}\n\n📩 Support: @${supportUsername}`;
 }
 function invoiceText(order) {
-  return `🧾 LYCA WEBSHOP · RECHNUNG / BESTELLBESTÄTIGUNG\\n\\nRechnungsnummer: ${order.invoiceNumber}\\nBestellnummer: ${order.orderNumber}\\nDatum: ${order.createdAt}\\n\\nKunde: ${order.customer.name}\\nAdresse: ${order.customer.address}\\nE-Mail: ${order.customer.email}\\n\\n${order.items.map(x => `• ${x.name} | Menge: ${x.qty} | ${formatMoney(x.price)} / Stück`).join('\\n')}\\n\\nGesamt: ${formatMoney(order.total)}\\nZahlungsstatus: ${order.paymentStatus}\\n\\nSupport: @${supportUsername}`;
+  return `🧾 LYCA WEBSHOP · RECHNUNG / BESTELLBESTÄTIGUNG\n\nRechnungsnummer: ${order.invoiceNumber}\nBestellnummer: ${order.orderNumber}\nDatum: ${order.createdAt}\n\nKunde: ${order.customer.name}\nAdresse: ${order.customer.address}\nE-Mail: ${order.customer.email}\n\n${order.items.map(x => `• ${x.name} | Menge: ${x.qty} | ${formatMoney(x.price)} / Stück`).join('\n')}\n\nGesamt: ${formatMoney(order.total)}\nZahlungsstatus: ${order.paymentStatus}\n\nSupport: @${supportUsername}`;
 }
 function botOrderUrl(orderNumber) { return `https://t.me/${botUsername}?start=${encodeURIComponent(String(orderNumber))}`; }
 function supportUrl(order) {
-  const text = order ? `Hallo Lyca Support, ich brauche Hilfe zu meiner Bestellung ${order.orderNumber}.\\n\\n${invoiceText(order)}` : 'Hallo Lyca Support, ich brauche Hilfe zu meiner Lyca-Webshop-Bestellung.';
+  const text = order ? `Hallo Lyca Support, ich brauche Hilfe zu meiner Bestellung ${order.orderNumber}.\n\n${invoiceText(order)}` : 'Hallo Lyca Support, ich brauche Hilfe zu meiner Lyca-Webshop-Bestellung.';
   return `https://t.me/${supportUsername}?text=${encodeURIComponent(text)}`;
 }
 function webAppButton() { return { text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl } }; }
@@ -188,12 +188,12 @@ function addToCart(chatId, productId, qty) {
 function clearCart(chatId) { getSession(chatId).cart = []; }
 function cartText(chatId) {
   const cart = cartItems(chatId);
-  if (!cart.length) return '🛒 DEIN WARENKORB\\n\\nDer Warenkorb ist leer.';
-  const lines = cart.map(x => `• ${x.name}\\n  Menge: ${x.qty}\\n  Preis: ${formatMoney(x.unitPrice)} / Stück\\n  Position: ${formatMoney(x.unitPrice * x.qty)}`).join('\\n\\n');
-  return `🛒 DEIN WARENKORB\\n\\n${lines}\\n\\n💶 Gesamt: ${formatMoney(cartTotal(chatId))}`;
+  if (!cart.length) return '🛒 DEIN WARENKORB\n\nDer Warenkorb ist leer.';
+  const lines = cart.map(x => `• ${x.name}\n  Menge: ${x.qty}\n  Preis: ${formatMoney(x.unitPrice)} / Stück\n  Position: ${formatMoney(x.unitPrice * x.qty)}`).join('\n\n');
+  return `🛒 DEIN WARENKORB\n\n${lines}\n\n💶 Gesamt: ${formatMoney(cartTotal(chatId))}`;
 }
 function productText() {
-  return `📱 LYCA MOBILE TRIPLE-SIM\\n\\n${products.lyca.description}\\n\\n✓ Standard-, Micro- und Nano-SIM\\n✓ Telefonie & SMS\\n✓ Mobiles Internet je nach Tarif\\n✓ Deutsche Nummer\\n\\n📦 MENGENPREISE\\n10 → 7,00 € / Stück\\n50 → 5,00 € / Stück\\n100 → 4,50 € / Stück\\n200 → 4,00 € / Stück\\n250 → 3,80 € / Stück\\n500 → 3,50 € / Stück\\n\\nWähle unten die gewünschte Menge.`;
+  return `📱 LYCA MOBILE TRIPLE-SIM\n\n${products.lyca.description}\n\n✓ Standard-, Micro- und Nano-SIM\n✓ Telefonie & SMS\n✓ Mobiles Internet je nach Tarif\n✓ Deutsche Nummer\n\n📦 MENGENPREISE\n10 → 7,00 € / Stück\n50 → 5,00 € / Stück\n100 → 4,50 € / Stück\n200 → 4,00 € / Stück\n250 → 3,80 € / Stück\n500 → 3,50 € / Stück\n\nWähle unten die gewünschte Menge.`;
 }
 
 async function sendOrder(order) {
@@ -208,7 +208,7 @@ async function sendOrder(order) {
   let customerNotified = false;
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
-    const result = await sendMessage(customerChatId, `✅ BESTELLUNG ERFOLGREICH ERSTELLT\\n\\n🔢 Bestellnummer: ${order.orderNumber}\\n🧾 Rechnungsnummer: ${order.invoiceNumber}\\n📅 ${order.createdAt}\\n\\n📌 Zahlungsstatus: ${order.paymentStatus}`, { reply_markup: orderKeyboard(order) });
+    const result = await sendMessage(customerChatId, `✅ BESTELLUNG ERFOLGREICH ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n📌 Zahlungsstatus: ${order.paymentStatus}`, { reply_markup: orderKeyboard(order) });
     customerNotified = Boolean(result.ok);
   }
   return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length, customerNotified, invoiceUrl: botOrderUrl(order.orderNumber), supportUrl: supportUrl(order) };
@@ -219,7 +219,7 @@ function businessReplyText(text) {
   const orderMatch = t.match(/\bLYCA-\d{8}-[A-F0-9]{6}\b/i);
   if (orderMatch) {
     const order = getOrder(orderMatch[0]);
-    if (order) return `✅ Ich habe deine Bestellung ${order.orderNumber} gefunden.\\n\\n${invoiceText(order)}\\n\\nWenn du weitere Hilfe brauchst, antworte einfach hier.`;
+    if (order) return `✅ Ich habe deine Bestellung ${order.orderNumber} gefunden.\n\n${invoiceText(order)}\n\nWenn du weitere Hilfe brauchst, antworte einfach hier.`;
   }
   if (/rechnung|invoice/i.test(t)) return '🧾 Bitte sende mir deine Bestellnummer, z. B. LYCA-20260917-ABC123.';
   if (/bestellung|order|bestell/i.test(t)) return '📦 Bitte sende mir deine Bestellnummer.';
@@ -277,7 +277,7 @@ async function showCart(chatId, messageId = null) {
 async function showOrders(chatId, messageId = null) {
   const session = getSession(chatId);
   const order = session.lastOrder ? getOrder(session.lastOrder) : null;
-  const text = order ? `📋 DEINE LETZTE BESTELLUNG\\n\\n${invoiceText(order)}` : '📋 BESTELLUNGEN\\n\\nNoch keine Bestellung in diesem Bot-Chat gespeichert.\\n\\nWenn du über den Webshop bestellt hast, kannst du die Bestellnummer hier mit /order BESTELLNUMMER aufrufen.';
+  const text = order ? `📋 DEINE LETZTE BESTELLUNG\n\n${invoiceText(order)}` : '📋 BESTELLUNGEN\n\nNoch keine Bestellung in diesem Bot-Chat gespeichert.\n\nWenn du über den Webshop bestellt hast, kannst du die Bestellnummer hier mit /order BESTELLNUMMER aufrufen.';
   if (messageId) return editMessage(chatId, messageId, text, orderKeyboard(order));
   return sendMessage(chatId, text, { reply_markup: orderKeyboard(order) });
 }
@@ -337,7 +337,7 @@ async function handleCallback(q) {
     const [, productId, qtyText] = data.split(':');
     const qty = Number(qtyText);
     if (addToCart(chatId, productId, qty)) {
-      return editMessage(chatId, messageId, `✅ Zum Warenkorb hinzugefügt\\n\\n${products[productId].name}\\nMenge: ${qty}\\nPreis: ${formatMoney(products[productId].prices[qty])} / Stück\\n\\n🛒 Warenkorb gesamt: ${formatMoney(cartTotal(chatId))}`, { inline_keyboard: [[callback('🛒 Warenkorb öffnen', 'cart')], [callback('➕ Weiter einkaufen', 'products')], [webAppButton()], [callback('↩️ Start', 'home')]] });
+      return editMessage(chatId, messageId, `✅ Zum Warenkorb hinzugefügt\n\n${products[productId].name}\nMenge: ${qty}\nPreis: ${formatMoney(products[productId].prices[qty])} / Stück\n\n🛒 Warenkorb gesamt: ${formatMoney(cartTotal(chatId))}`, { inline_keyboard: [[callback('🛒 Warenkorb öffnen', 'cart')], [callback('➕ Weiter einkaufen', 'products')], [webAppButton()], [callback('↩️ Start', 'home')]] });
     }
     return showProduct(chatId, messageId);
   }
@@ -404,7 +404,7 @@ async function handleUpdate(update) {
   }
   if (command === '/myid') return sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`, { reply_markup: mainKeyboard() });
   if (command === '/shop') return showProducts(chatId);
-  if (command === '/support') return sendMessage(chatId, `💬 LYCA SUPPORT\\n\\n@${supportUsername}`, { reply_markup: mainKeyboard() });
+  if (command === '/support') return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
   if (command === '/order') {
     const order = getOrder(parts[1]);
     if (order) session.lastOrder = order.orderNumber;
@@ -418,7 +418,7 @@ async function handleUpdate(update) {
   if (/warenkorb|cart/i.test(text)) return showCart(chatId);
   if (/produkte|produkt|sim/i.test(text)) return showProducts(chatId);
   if (/bestellung|order/i.test(text)) return showOrders(chatId);
-  if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\\n\\n@${supportUsername}`, { reply_markup: mainKeyboard() });
+  if (/support|hilfe/i.test(text)) return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
   return sendMessage(chatId, '👋 Willkommen beim Lyca Webshop. Nutze die Schaltflächen unten, um Produkte, Warenkorb, Bestellung und Support zu öffnen.', { reply_markup: mainKeyboard() });
 }
 
