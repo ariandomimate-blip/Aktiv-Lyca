@@ -370,7 +370,7 @@ async function handleCallback(q) {
   if (data.startsWith('paid:')) {
     const order = getOrder(data.slice(5));
     const actorUsername = String(q.from?.username || '').replace(/^@/, '');
-    const isAdmin = adminChatIds.has(String(chatId)) || actorUsername.toLowerCase() === supportUsername.toLowerCase();
+    const isAdmin = adminChatIds.has(String(chatId));
     if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Administrator freigeschaltet.');
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     await markOrderPaid(order, chatId, q.message || null);
