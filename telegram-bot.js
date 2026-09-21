@@ -310,10 +310,10 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
     );
   }
 
-  // Erst jetzt erhält der Support die vollständigen Kundendaten und Bestell-/Rechnungsinformationen.
-  if (supportChatId && String(supportChatId) !== String(actorChatId)) {
+  // Nach der Bestätigung erhält Lyca_Support die fertige Rechnung ebenfalls.
+  if (supportChatId) {
     await sendMessage(supportChatId,
-      `💰 BEZAHLTE BESTELLUNG – SUPPORT\n\n${paidText}`,
+      `🧾 RECHNUNG – LYCA_SUPPORT\n\n${invoiceText(order)}\n\n💰 ZAHLUNG BESTÄTIGT\nTXID: ${order.transactionId || 'nicht angegeben'}\nBestätigt: ${order.paidAt}`,
       { reply_markup: { inline_keyboard: [] } }
     );
   }
