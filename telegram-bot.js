@@ -426,6 +426,14 @@ async function configure(baseUrl = publicBaseUrl) {
   const me = await api('getMe');
   if (!me.ok) return { enabled: false, reason: me.description || 'Telegram token rejected' };
   if (me.result?.username) botUsername = String(me.result.username).replace(/^@/, '');
+  // If the support account has already opened/authorized this bot, resolve it
+  // automatically so new orders reach Support without a manually copied chat ID.
+  try {
+    const supportChat = await api('getChat', { chat_id: '@' + supportUsername });
+    if (supportChat.ok && supportChat.result?.id != null) {
+      adminChatIds.add(String(supportChat.result.id));
+    }
+  } catch {}
   if (baseUrl) {
     const webhookUrl = `${baseUrl}/api/telegram-webhook`;
     const body = { url: webhookUrl, allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'], drop_pending_updates: false };
