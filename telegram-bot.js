@@ -62,7 +62,7 @@ function qrUrl(value) {
 function paymentKeyboard(order) {
   if (!order) return { inline_keyboard: [] };
   return { inline_keyboard: [
-    [callback('💰 Zahlung bestätigen & TX-ID eingeben', 'paid_notice:' + order.orderNumber)]
+    [callback('🔗 Transaktions-ID eingeben', 'txid_input:' + order.orderNumber)]
   ] };
 }
 function adminOrderKeyboard(order) {
@@ -354,27 +354,6 @@ async function handleCallback(q) {
     );
   }
 
-  if (data.startsWith('paid_notice:')) {
-    const order = getOrder(data.slice(12));
-    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
-    if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
-
-    const session = getSession(chatId);
-    session.pendingPaymentOrder = null;
-
-    if (messageId) {
-      await editMessage(chatId, messageId,
-        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte zuerst den Button „🔗 TX-ID eingeben“ drücken.\\n\\n⚠️ Die Zahlung bleibt UNBESTÄTIGT, bis der Administrator die TXID geprüft und bestätigt hat.`,
-        { inline_keyboard: [] }
-      );
-    } else {
-      await sendMessage(chatId,
-        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte sende jetzt die vollständige Transaktions-ID / TXID deiner Zahlung als nächste Nachricht.`
-      );
-    }
-    return;
-  }
-
   if (data.startsWith('paid:')) {
     const order = getOrder(data.slice(5));
     const actorUsername = String(q.from?.username || '').replace(/^@/, '');
@@ -436,15 +415,15 @@ async function handleUpdate(update) {
       order.paymentReportedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
       session.pendingPaymentOrder = null;
 
-      const recipients = Array.from(adminChatIds);
-      const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG ERFORDERLICH\\n\\n${formatOrder(order)}\\n\\n🔗 Transaktions-ID / TXID:\\n${order.transactionId}\\n\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}`;
+      const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG DURCH LYCA_SUPPORT\\n\\n${formatOrder(order)}\\n\\n🔗 Transaktions-ID / TXID:\\n${order.transactionId}\\n\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}\\n\\nBitte TXID prüfen und anschließend „✅ Zahlung bestätigen“ drücken. Erst dann wird die Rechnung an Kunde und Support gesendet.`;
+      const recipients = supportChatId ? [String(supportChatId)] : Array.from(adminChatIds);
       for (const adminId of recipients) {
         await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
       }
       if (!recipients.length) {
-        return sendMessage(chatId, '⚠️ TXID gespeichert, aber es ist noch kein Administrator-Chat konfiguriert.');
+        return sendMessage(chatId, '⚠️ TXID gespeichert, aber Lyca_Support ist noch nicht als Administrator erreichbar.');
       }
-      return sendMessage(chatId, `⏳ ZAHLUNG GEMELDET\\n\\nBestellung: ${order.orderNumber}\\nTXID: ${order.transactionId}\\n\\nDie Zahlung wird jetzt vom Administrator geprüft. Erst nach der manuellen Bestätigung wird die Bestellung als BEZAHLT markiert.`);
+      return sendMessage(chatId, `⏳ TX-ID ÜBERMITTELT\\n\\nBestellung: ${order.orderNumber}\\nTXID: ${order.transactionId}\\n\\nDie Transaktions-ID wurde direkt an @${supportUsername} zur Prüfung gesendet. Nach der Bestätigung erhältst du automatisch die Rechnung.`);
     }
     session.pendingPaymentOrder = null;
   }
