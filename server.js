@@ -209,7 +209,7 @@ async function telegramStatus(req,res) {
     shop_url:PUBLIC_BASE_URL,
     support_username:SUPPORT_USERNAME,
     support_url:SUPPORT_URL,
-    invitation:`👋 Willkommen im Lyca Webshop!\\n\\n🛍️ Lyca Mobile Triple-SIM online bestellen.\\n📦 Produkte · Warenkorb · Bestellung · Rechnung\\n\\n🔗 ${BOT_INVITE_URL()}`
+    invitation:`👋 Willkommen im Lyca Webshop!\n\n🛍️ Lyca Mobile Triple-SIM online bestellen.\n📦 Produkte · Warenkorb · Bestellung · Rechnung\n\n🔗 ${BOT_INVITE_URL()}`
   });
 }
 
@@ -222,7 +222,7 @@ async function telegramInvite(req,res) {
     authenticated:d.authenticated,
     description:BOT_DESCRIPTION,
     short_description:BOT_SHORT_DESCRIPTION,
-    message:`👋 LYCA WEBSHOP\\n\\nWillkommen! 🛍️\\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\\n\\n📱 Standard · Micro · Nano\\n📦 Mengenpreise im Shop\\n🧾 Bestellung & Rechnung\\n❓ Support: @${SUPPORT_USERNAME}\\n\\n👉 Bot öffnen: ${BOT_INVITE_URL()}`
+    message:`👋 LYCA WEBSHOP\n\nWillkommen! 🛍️\nBestelle deine Lyca Mobile Triple-SIM direkt über Telegram.\n\n📱 Standard · Micro · Nano\n📦 Mengenpreise im Shop\n🧾 Bestellung & Rechnung\n❓ Support: @${SUPPORT_USERNAME}\n\n👉 Bot öffnen: ${BOT_INVITE_URL()}`
   });
 }
 
