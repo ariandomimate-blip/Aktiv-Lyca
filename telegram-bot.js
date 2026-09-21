@@ -13,10 +13,12 @@ const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || proce
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
 if (supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
+let walletConfig = {};
+try { walletConfig = require('./payment_wallets.json')?.payment_wallets || {}; } catch {}
 const wallets = {
-  BTC: process.env.BTC_WALLET || 'bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx',
-  SOL: process.env.SOL_WALLET || '2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA',
-  BNB: process.env.BNB_WALLET || '0x7f6dde8179319425917eD0c9fd84952f98b0C2A4'
+  BTC: process.env.BTC_WALLET || walletConfig.BTC || '',
+  SOL: process.env.SOL_WALLET || walletConfig.SOL || '',
+  BNB: process.env.BNB_WALLET || walletConfig.BNB_SMART_CHAIN || ''
 };
 
 const orders = new Map();
@@ -50,6 +52,25 @@ function supportUrl(order) {
 function webAppButton() { return { text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl } }; }
 function urlButton(text, url) { return { text, url }; }
 function callback(text, data) { return { text, callback_data: data }; }
+function qrUrl(value) {
+  return 'https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=12&data=' + encodeURIComponent(String(value || ''));
+}
+function paymentKeyboard(order) {
+  const rows = [];
+  if (order) rows.push([callback('💳 Bitcoin / Solana / BNB', 'wallets:' + order.orderNumber)]);
+  rows.push([urlButton('💬 Lyca Support kontaktieren', supportUrl(order))]);
+  if (order) rows.push([callback('🧾 Rechnung', 'invoice:' + order.orderNumber)]);
+  rows.push([webAppButton(), callback('↩️ Start', 'home')]);
+  return { inline_keyboard: rows };
+}
+function adminOrderKeyboard(order) {
+  return { inline_keyboard: [
+    [callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)],
+    [callback('✅ Zahlung bestätigt', 'paid:' + order.orderNumber)],
+    [callback('🧾 Rechnung', 'invoice:' + order.orderNumber)],
+    [urlButton('💬 Support', supportUrl(order))]
+  ] };
+}
 
 function mainKeyboard() {
   return { inline_keyboard: [
@@ -94,16 +115,42 @@ function walletKeyboard() {
 }
 function walletText(coin) {
   const address = wallets[coin];
-  const names = { BTC:'Bitcoin (BTC)', SOL:'Solana (SOL)', BNB:'BNB' };
-  return `💳 ZAHLUNGS-WALLET\n\n${names[coin] || coin}\n\n${address}\n\n⚠️ Bitte ausschließlich die angegebene Kryptowährung an diese Adresse senden. Prüfe die Adresse vor dem Versand.\n\nFür Bestell- und Zahlungsfragen: @${supportUsername}`;
+  const names = { BTC:'Bitcoin (BTC)', SOL:'Solana (SOL)', BNB:'BNB Smart Chain' };
+  return `💳 ZAHLUNGS-WALLET\n\n${names[coin] || coin}\n\n${address || 'Wallet nicht konfiguriert.'}\n\n⚠️ Bitte ausschließlich die angegebene Kryptowährung an diese Adresse senden. Prüfe die Adresse vor dem Versand.\n\nFür Bestell- und Zahlungsfragen: @${supportUsername}`;
 }
-function walletsText() {
-  return `💳 LYCA WEBSHOP · ZAHLUNGS-WALLETS\n\n₿ Bitcoin (BTC)\n${wallets.BTC}\n\n◎ Solana (SOL)\n${wallets.SOL}\n\n◆ BNB\n${wallets.BNB}\n\n⚠️ Bitte nur die jeweils passende Kryptowährung an die dazugehörige Adresse senden.`;
+function walletsText(order) {
+  const suffix = order ? `\n\n🔢 Bestellnummer: ${order.orderNumber}\n💶 Gesamt: ${formatMoney(order.total)}\n📌 Status: ${order.paymentStatus}` : '';
+  return `💳 LYCA WEBSHOP · ZAHLUNGS-WALLETS${suffix}\n\n₿ Bitcoin (BTC)\n${wallets.BTC || 'nicht konfiguriert'}\n\n◎ Solana (SOL)\n${wallets.SOL || 'nicht konfiguriert'}\n\n◆ BNB Smart Chain\n${wallets.BNB || 'nicht konfiguriert'}\n\n⚠️ Sende nur die jeweils passende Kryptowährung an die dazugehörige Adresse. Nach der Zahlung bitte Lyca Support kontaktieren.`;
 }
-function orderKeyboard(order) {
+async function sendWalletQRCodes(chatId, order = null) {
+  const title = order
+    ? `💳 ZAHLUNG FÜR BESTELLUNG ${order.orderNumber}\n\nGesamt: ${formatMoney(order.total)}\nStatus: ${order.paymentStatus}\n\nScanne den gewünschten QR-Code. Anschließend bitte @${supportUsername} kontaktieren.`
+    : '💳 LYCA WEBSHOP · WALLET-QR-CODES\n\nScanne den gewünschten QR-Code.';
+  await sendMessage(chatId, title, { reply_markup: paymentKeyboard(order) });
+  const entries = [
+    ['BTC','₿ Bitcoin (BTC)',wallets.BTC],
+    ['SOL','◎ Solana (SOL)',wallets.SOL],
+    ['BNB','◆ BNB Smart Chain',wallets.BNB]
+  ];
+  for (const [coin,label,address] of entries) {
+    if (!address) continue;
+    const result = await api('sendPhoto', {
+      chat_id: chatId,
+      photo: qrUrl(address),
+      caption: `${label}\n\n${address}\n\n${order ? 'Bestellung: ' + order.orderNumber : 'Lyca Webshop'}`,
+      reply_markup: paymentKeyboard(order)
+    });
+    if (!result.ok) {
+      console.error(`Lyca Bot: QR send failed for ${coin}: ${result.description || 'unknown Telegram error'}`);
+      await sendMessage(chatId, `${label}\n\n${address}`, { reply_markup: paymentKeyboard(order) });
+    }
+  }
+}
+function orderKeyboard(order, admin = false) {
+  if (order && admin) return adminOrderKeyboard(order);
   const rows = [];
-  if (order) rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)], [callback('💳 Wallets', 'wallets')], [callback('🛒 Shop öffnen', 'products')]);
-  rows.push([webAppButton(), urlButton('❓ Support', `https://t.me/${supportUsername}`)], [callback('↩️ Start', 'home')]);
+  if (order) rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)], [callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)], [urlButton('💬 Support kontaktieren', supportUrl(order))], [callback('🛒 Shop öffnen', 'products')]);
+  rows.push([webAppButton(), callback('↩️ Start', 'home')]);
   return { inline_keyboard: rows };
 }
 
@@ -153,7 +200,7 @@ async function sendOrder(order) {
   const recipients = Array.from(adminChatIds);
   for (const chatId of recipients) {
     try {
-      const result = await sendMessage(chatId, formatOrder(order), { reply_markup: orderKeyboard(order) });
+      const result = await sendMessage(chatId, formatOrder(order), { reply_markup: orderKeyboard(order, true) });
       if (!result.ok) console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
     } catch (err) { console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message); }
   }
@@ -234,6 +281,25 @@ async function showOrders(chatId, messageId = null) {
   return sendMessage(chatId, text, { reply_markup: orderKeyboard(order) });
 }
 
+async function markOrderPaid(order, actorChatId) {
+  if (!order) return false;
+  order.paymentStatus = 'BEZAHLT';
+  order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  const customerChatId = String(order.telegramChatId || '').trim();
+  if (customerChatId) {
+    await sendMessage(customerChatId,
+      `✅ ZAHLUNG BESTÄTIGT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n💶 Gesamt: ${formatMoney(order.total)}\n\nIhre Zahlung wurde als bezahlt bestätigt.\n\n🧾 RECHNUNG\n${invoiceText(order)}\n\n💬 Support: @${supportUsername}`,
+      { reply_markup: orderKeyboard(order) }
+    );
+  }
+  if (actorChatId) {
+    await sendMessage(actorChatId,
+      `✅ Zahlung für ${order.orderNumber} wurde bestätigt.\n\n${invoiceText(order)}`,
+      { reply_markup: orderKeyboard(order, true) }
+    );
+  }
+  return true;
+}
 async function handleCallback(q) {
   await api('answerCallbackQuery', { callback_query_id: q.id });
   const chatId = q.message?.chat?.id;
@@ -246,13 +312,26 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
-  if (data === 'wallets') return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
+  if (data === 'wallets') return sendWalletQRCodes(chatId, null);
+  if (data.startsWith('wallets:')) {
+    const order = getOrder(data.slice(8));
+    return sendWalletQRCodes(chatId, order);
+  }
   if (data.startsWith('wallet:')) {
     const coin = data.split(':')[1];
     if (!wallets[coin]) return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
   }
   if (data === 'checkout') return sendMessage(chatId, '🧾 Bitte öffne den Lyca-Webshop, um die Bestellung mit deinen Kontaktdaten abzuschließen.', { reply_markup: { inline_keyboard: [[webAppButton()], [callback('↩️ Start', 'home')]] } });
+  if (data.startsWith('paid:')) {
+    const order = getOrder(data.slice(5));
+    const actorUsername = String(q.from?.username || '').replace(/^@/, '');
+    const isAdmin = adminChatIds.has(String(chatId)) || actorUsername.toLowerCase() === supportUsername.toLowerCase();
+    if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Support freigeschaltet.');
+    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
+    await markOrderPaid(order, chatId);
+    return;
+  }
   if (data.startsWith('add:')) {
     const [, productId, qtyText] = data.split(':');
     const qty = Number(qtyText);
@@ -299,6 +378,7 @@ async function handleUpdate(update) {
       return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     }
     const deepLinkedOrder = getOrder(startParam);
+    if (deepLinkedOrder) deepLinkedOrder.telegramChatId = String(chatId);
     const latestOrder = deepLinkedOrder || Array.from(orders.values())
       .filter(o => String(o.telegramChatId || '') === String(chatId))
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
