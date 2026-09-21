@@ -57,19 +57,15 @@ function qrUrl(value) {
   return 'https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=12&data=' + encodeURIComponent(String(value || ''));
 }
 function paymentKeyboard(order) {
-  const rows = [];
-  if (order) rows.push([callback('💳 Bitcoin / Solana / BNB', 'wallets:' + order.orderNumber)]);
-  rows.push([urlButton('💬 Lyca Support kontaktieren', supportUrl(order))]);
-  if (order) rows.push([callback('🧾 Rechnung', 'invoice:' + order.orderNumber)]);
-  rows.push([webAppButton(), callback('↩️ Start', 'home')]);
-  return { inline_keyboard: rows };
+  if (!order) return { inline_keyboard: [] };
+  return { inline_keyboard: [
+    [callback('💰 Zahlung getätigt – zur Prüfung', 'paid_notice:' + order.orderNumber)]
+  ] };
 }
 function adminOrderKeyboard(order) {
+  if (!order || order.paymentStatus === 'BEZAHLT') return { inline_keyboard: [] };
   return { inline_keyboard: [
-    [callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)],
-    [callback('✅ Zahlung bestätigt', 'paid:' + order.orderNumber)],
-    [callback('🧾 Rechnung', 'invoice:' + order.orderNumber)],
-    [urlButton('💬 Support', supportUrl(order))]
+    [callback('✅ Zahlung bestätigen', 'paid:' + order.orderNumber)]
   ] };
 }
 
@@ -125,9 +121,9 @@ function walletsText(order) {
 }
 async function sendWalletQRCodes(chatId, order = null) {
   const title = order
-    ? `💳 ZAHLUNG FÜR BESTELLUNG ${order.orderNumber}\n\nGesamt: ${formatMoney(order.total)}\nStatus: ${order.paymentStatus}\n\nScanne den gewünschten QR-Code. Anschließend bitte @${supportUsername} kontaktieren.`
-    : '💳 LYCA WEBSHOP · WALLET-QR-CODES\n\nScanne den gewünschten QR-Code.';
-  await sendMessage(chatId, title, { reply_markup: paymentKeyboard(order) });
+    ? `💳 ZAHLUNG FÜR BESTELLUNG ${order.orderNumber}\n\nGesamt: ${formatMoney(order.total)}\nStatus: ${order.paymentStatus}\n\nScanne den gewünschten QR-Code. Nach der Überweisung drücke unten einmal „Zahlung getätigt“.`
+    : '💳 LYCA WEBSHOP · ZAHLUNGS-WALLETS\n\nScanne den gewünschten QR-Code.';
+  await sendMessage(chatId, title);
   const entries = [
     ['BTC','₿ Bitcoin (BTC)',wallets.BTC],
     ['SOL','◎ Solana (SOL)',wallets.SOL],
@@ -138,13 +134,18 @@ async function sendWalletQRCodes(chatId, order = null) {
     const result = await api('sendPhoto', {
       chat_id: chatId,
       photo: qrUrl(address),
-      caption: `${label}\n\n${address}\n\n${order ? 'Bestellung: ' + order.orderNumber : 'Lyca Webshop'}`,
-      reply_markup: paymentKeyboard(order)
+      caption: `${label}\n\n${address}\n\n${order ? 'Bestellung: ' + order.orderNumber : 'Lyca Webshop'}`
     });
     if (!result.ok) {
       console.error(`Lyca Bot: QR send failed for ${coin}: ${result.description || 'unknown Telegram error'}`);
-      await sendMessage(chatId, `${label}\n\n${address}`, { reply_markup: paymentKeyboard(order) });
+      await sendMessage(chatId, `${label}\n\n${address}`);
     }
+  }
+  if (order) {
+    await sendMessage(chatId,
+      `🔘 ZAHLUNGSSTATUS\n\nBestellung: ${order.orderNumber}\nStatus: ${order.paymentStatus}\n\nNach deiner Zahlung einmal den Button drücken. Die Zahlung wird anschließend vom Administrator geprüft und bestätigt.`,
+      { reply_markup: paymentKeyboard(order) }
+    );
   }
 }
 function orderKeyboard(order, admin = false) {
@@ -201,15 +202,18 @@ async function sendOrder(order) {
   const recipients = Array.from(adminChatIds);
   for (const chatId of recipients) {
     try {
-      const result = await sendMessage(chatId, formatOrder(order), { reply_markup: orderKeyboard(order, true) });
+      const result = await sendMessage(chatId, formatOrder(order), { reply_markup: adminOrderKeyboard(order) });
       if (!result.ok) console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
     } catch (err) { console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message); }
   }
   let customerNotified = false;
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
-    const result = await sendMessage(customerChatId, `✅ BESTELLUNG ERFOLGREICH ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n📌 Zahlungsstatus: ${order.paymentStatus}`, { reply_markup: orderKeyboard(order) });
+    const result = await sendMessage(customerChatId,
+      `✅ BESTELLUNG ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n💶 Gesamt: ${formatMoney(order.total)}\n\nDie Zahlungs-Wallets folgen jetzt. Danach erscheint genau ein Button zur Meldung der Zahlung.`
+    );
     customerNotified = Boolean(result.ok);
+    await sendWalletQRCodes(customerChatId, order);
   }
   return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length, customerNotified, invoiceUrl: botOrderUrl(order.orderNumber), supportUrl: supportUrl(order) };
 }
@@ -282,21 +286,32 @@ async function showOrders(chatId, messageId = null) {
   return sendMessage(chatId, text, { reply_markup: orderKeyboard(order) });
 }
 
-async function markOrderPaid(order, actorChatId) {
+async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   if (!order) return false;
   order.paymentStatus = 'BEZAHLT';
   order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+  const paidText = formatOrder(order) + `\n\n💰 ZAHLUNG BESTÄTIGT\n🕒 Bestätigt: ${order.paidAt}\n\n🧾 RECHNUNG\n${invoiceText(order)}`;
+
+  // Entfernt den Bestätigungsbutton beim Administrator nach der Bestätigung.
+  if (sourceMessage?.message_id) {
+    await editMessage(sourceMessage.chat.id, sourceMessage.message_id, paidText, { inline_keyboard: [] });
+  } else if (actorChatId) {
+    await sendMessage(actorChatId, paidText, { reply_markup: { inline_keyboard: [] } });
+  }
+
+  // Der Kunde erhält erst nach der manuellen Bestätigung die Rechnung.
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     await sendMessage(customerChatId,
-      `✅ ZAHLUNG BESTÄTIGT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n💶 Gesamt: ${formatMoney(order.total)}\n\nIhre Zahlung wurde als bezahlt bestätigt.\n\n🧾 RECHNUNG\n${invoiceText(order)}\n\n💬 Support: @${supportUsername}`,
-      { reply_markup: orderKeyboard(order) }
+      `✅ ZAHLUNG BESTÄTIGT\n\nBestellnummer: ${order.orderNumber}\nRechnungsnummer: ${order.invoiceNumber}\nGesamt: ${formatMoney(order.total)}\n\nDie Zahlung wurde vom Administrator bestätigt.\n\n🧾 RECHNUNG\n${invoiceText(order)}`
     );
   }
-  if (actorChatId) {
-    await sendMessage(actorChatId,
-      `✅ Zahlung für ${order.orderNumber} wurde bestätigt.\n\n${invoiceText(order)}`,
-      { reply_markup: orderKeyboard(order, true) }
+
+  // Erst jetzt erhält der Support die vollständigen Kundendaten und Bestell-/Rechnungsinformationen.
+  if (supportChatId && String(supportChatId) !== String(actorChatId)) {
+    await sendMessage(supportChatId,
+      `💰 BEZAHLTE BESTELLUNG – SUPPORT\n\n${paidText}`,
+      { reply_markup: { inline_keyboard: [] } }
     );
   }
   return true;
@@ -324,13 +339,38 @@ async function handleCallback(q) {
     return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
   }
   if (data === 'checkout') return sendMessage(chatId, '🧾 Bitte öffne den Lyca-Webshop, um die Bestellung mit deinen Kontaktdaten abzuschließen.', { reply_markup: { inline_keyboard: [[webAppButton()], [callback('↩️ Start', 'home')]] } });
+  if (data.startsWith('paid_notice:')) {
+    const order = getOrder(data.slice(12));
+    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
+    if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
+
+    order.paymentReportedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
+    const recipients = Array.from(adminChatIds);
+    const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG ERFORDERLICH\n\n${formatOrder(order)}\n\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}`;
+    for (const adminId of recipients) {
+      await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
+    }
+
+    // Button beim Kunden nach einmaliger Meldung entfernen.
+    if (messageId) {
+      await editMessage(chatId, messageId,
+        `⏳ ZAHLUNG GEMELDET\n\nBestellung: ${order.orderNumber}\nStatus: UNBEZAHLT – wartet auf Administratorprüfung.\n\nBitte nicht erneut melden.`,
+        { inline_keyboard: [] }
+      );
+    }
+    if (!recipients.length) {
+      return sendMessage(chatId, '⚠️ Zahlung wurde gemeldet, aber es ist noch kein Administrator-Chat konfiguriert.');
+    }
+    return;
+  }
+
   if (data.startsWith('paid:')) {
     const order = getOrder(data.slice(5));
     const actorUsername = String(q.from?.username || '').replace(/^@/, '');
     const isAdmin = adminChatIds.has(String(chatId)) || actorUsername.toLowerCase() === supportUsername.toLowerCase();
-    if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Support freigeschaltet.');
+    if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Administrator freigeschaltet.');
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
-    await markOrderPaid(order, chatId);
+    await markOrderPaid(order, chatId, q.message || null);
     return;
   }
   if (data.startsWith('add:')) {
