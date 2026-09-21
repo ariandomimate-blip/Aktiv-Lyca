@@ -342,17 +342,29 @@ async function handleCallback(q) {
     return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
   }
   if (data === 'checkout') return sendMessage(chatId, '🧾 Bitte öffne den Lyca-Webshop, um die Bestellung mit deinen Kontaktdaten abzuschließen.', { reply_markup: { inline_keyboard: [[webAppButton()], [callback('↩️ Start', 'home')]] } });
+  if (data.startsWith('txid_input:')) {
+    const order = getOrder(data.slice(12));
+    if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
+    if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
+    const session = getSession(chatId);
+    session.pendingPaymentOrder = order.orderNumber;
+    return sendMessage(chatId,
+      `🔗 TX-ID EINGEBEN\n\nBestellung: ${order.orderNumber}\n\nBitte sende jetzt die vollständige Transaktions-ID / TXID als nächste Nachricht.\n\nDanach wird sie direkt an Lyca_Support zur Prüfung weitergeleitet.`,
+      { reply_markup: { force_reply: true, input_field_placeholder: 'Transaktions-ID / TXID' } }
+    );
+  }
+
   if (data.startsWith('paid_notice:')) {
     const order = getOrder(data.slice(12));
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
 
     const session = getSession(chatId);
-    session.pendingPaymentOrder = order.orderNumber;
+    session.pendingPaymentOrder = null;
 
     if (messageId) {
       await editMessage(chatId, messageId,
-        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte sende jetzt die vollständige Transaktions-ID / TXID deiner Zahlung als nächste Nachricht.\\n\\n⚠️ Die Zahlung bleibt UNBESTÄTIGT, bis der Administrator die TXID geprüft und bestätigt hat.`,
+        `🧾 TRANSAKTIONS-ID ERFORDERLICH\\n\\nBestellung: ${order.orderNumber}\\nGesamt: ${formatMoney(order.total)}\\n\\nBitte zuerst den Button „🔗 TX-ID eingeben“ drücken.\\n\\n⚠️ Die Zahlung bleibt UNBESTÄTIGT, bis der Administrator die TXID geprüft und bestätigt hat.`,
         { inline_keyboard: [] }
       );
     } else {
