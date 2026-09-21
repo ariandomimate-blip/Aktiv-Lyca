@@ -12,7 +12,10 @@ const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
-if (supportChatId) adminChatIds.add(supportChatId);
+// If no separate administrator chat is configured, keep Support as the emergency recipient
+// so orders are not lost. When TELEGRAM_ADMIN_CHAT_IDS is configured, Support receives
+// the complete order only after the administrator confirms payment.
+if (!adminChatIds.size && supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 let walletConfig = {};
 try { walletConfig = require('./payment_wallets.json')?.payment_wallets || {}; } catch {}
