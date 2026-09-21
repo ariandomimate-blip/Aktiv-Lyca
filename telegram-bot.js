@@ -8,7 +8,7 @@ const token = telegramServiceEnabled ? String(
 ).trim() : '';
 
 let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop1_Bot').replace(/^@/, '');
-const publicBaseUrl = String(process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_BASE_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/, '');
+const publicBaseUrl = 'https://webshop-sim-1.onrender.com';
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
