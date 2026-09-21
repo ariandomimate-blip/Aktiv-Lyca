@@ -1,10 +1,11 @@
-const token = String(
+const telegramServiceEnabled = String(process.env.TELEGRAM_SERVICE_ENABLED || 'true').toLowerCase() !== 'false';
+const token = telegramServiceEnabled ? String(
   process.env.TELEGRAM_BOT_TOKEN ||
   process.env.TELEGRAM_TOKEN ||
   process.env.TELEGRAM_API_TOKEN ||
   process.env.BOT_TOKEN ||
   ''
-).trim();
+).trim() : '';
 
 let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop1_Bot').replace(/^@/, '');
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://webshop-sim.onrender.com').replace(/\/$/, '');
