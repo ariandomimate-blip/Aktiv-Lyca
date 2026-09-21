@@ -56,7 +56,9 @@ $('#checkoutForm').onsubmit=async e=>{
     const copyBtn=document.getElementById('copyInvoice');
     if(copyBtn)copyBtn.onclick=async()=>{try{await navigator.clipboard.writeText(invoiceText);copyBtn.textContent='✓ Rechnung kopiert';}catch{alert('Rechnung konnte nicht automatisch kopiert werden.')}};
     e.target.reset();
-    setTimeout(()=>openTelegramSupport(botUrl),250);
+    // Open the verified bot deep link after the success UI is painted.
+    // The bot URL is generated from Telegram getMe() on the server.
+    setTimeout(()=>openTelegramSupport(botUrl),350);
   }catch(err){
     console.error('Lyca checkout error:',err);
     const msg=String(err?.message||err||'Unbekannter Fehler');
