@@ -24,7 +24,8 @@ process.env.TELEGRAM_BOT_TOKEN = normalizeTelegramToken(
 const telegram = require('./telegram-bot');
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
-const PUBLIC_BASE_URL = 'https://webshop-sim-1.onrender.com';
+// The Render onrender.com subdomain is disabled for this service. Use the connected production domain.
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://lyca-aktiv.de').replace(/\/$/,'');
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
@@ -284,6 +285,8 @@ const server = http.createServer(async (req,res) => {
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
 
+  // Always serve the homepage explicitly. This avoids a false 404 when the root path is requested by Telegram/Safari.
+  if (req.method === 'GET' && (route === '/' || route === '/index.html')) return sendFile(path.join(root,'index.html'),res);
   let filePath;
   try { filePath = safePath(req.url || '/'); } catch { res.writeHead(400); return res.end('Bad Request'); }
   if (!filePath) { res.writeHead(403); return res.end('Forbidden'); }
@@ -308,4 +311,4 @@ function sendFile(filePath,res) {
   });
 }
 
-server.listen(port,'0.0.0.0',()=>{ console.log(`Lyca Webshop server listening on port ${port}`); setupTelegram(); });
+server.listen(port,'0.0.0.0',()=>{ console.log(`Lyca Webshop server listening on port ${port}`); console.log('Lyca Webshop root:',root,'index exists:',fs.existsSync(path.join(root,'index.html')),'public URL:',PUBLIC_BASE_URL); setupTelegram(); });
