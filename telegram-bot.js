@@ -425,8 +425,8 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   }
 
   // Nach der Bestätigung erhält Lyca_Support die fertige Rechnung ebenfalls.
-  if (supportChatId) {
-    await sendMessage(supportChatId,
+  if (resolvedSupportChatId) {
+    await sendMessage(resolvedSupportChatId,
       `🧾 RECHNUNG – LYCA_SUPPORT\n\n${invoiceText(order)}\n\n💰 ZAHLUNG BESTÄTIGT\nTXID: ${order.transactionId || 'nicht angegeben'}\nBestätigt: ${order.paidAt}`,
       { reply_markup: { inline_keyboard: [] } }
     );
