@@ -616,7 +616,8 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'invoice', description: 'Rechnung anzeigen' },
     { command: 'support', description: 'Support kontaktieren' },
     { command: 'wallets', description: 'Zahlungs-Wallets anzeigen' },
-    { command: 'myid', description: 'Telegram Chat-ID anzeigen' }
+    { command: 'myid', description: 'Telegram Chat-ID anzeigen' },
+    { command: 'admin', description: 'Administrator-Panel für Lyca_Support' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
   return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: Boolean(me.result?.can_connect_to_business), canConnectToBusiness: Boolean(me.result?.can_connect_to_business), miniAppUrl: baseUrl };
