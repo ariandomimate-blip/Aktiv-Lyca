@@ -405,9 +405,22 @@ async function showOrders(chatId, messageId = null) {
 
 async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   if (!order) return false;
+  const txid = String(order.transactionId || '').trim();
+  // A payment can NEVER be confirmed before the customer has submitted a TXID.
+  // The administrator must see the TXID and explicitly press the confirmation button.
+  if (!txid) {
+    if (actorChatId) {
+      await sendMessage(actorChatId,
+        `⛔ ZAHLUNG NICHT BESTÄTIGT\\n\\nBestellung: ${order.orderNumber}\\n\\nFür diese Bestellung wurde noch keine Transaktions-ID (TXID) vom Kunden übermittelt. Erst TXID eingeben lassen, prüfen und danach „✅ Zahlung bestätigen“ drücken.`,
+        { reply_markup: adminOrderKeyboard(order) }
+      );
+    }
+    return false;
+  }
+  if (order.paymentStatus === 'BEZAHLT') return true;
   order.paymentStatus = 'BEZAHLT';
   order.paidAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
-  const paidText = formatOrder(order) + `\n\n🔗 Transaktions-ID / TXID:\n${order.transactionId || 'nicht angegeben'}\n\n💰 ZAHLUNG BESTÄTIGT\n🕒 Bestätigt: ${order.paidAt}\n\n🧾 RECHNUNG\n${invoiceText(order)}`;
+  const paidText = formatOrder(order) + `\n\n🔗 Transaktions-ID / TXID:\n${txid}\n\n💰 ZAHLUNG BESTÄTIGT\n🕒 Bestätigt: ${order.paidAt}\n\n🧾 RECHNUNG\n${invoiceText(order)}`;
 
   // Entfernt den Bestätigungsbutton beim Administrator nach der Bestätigung.
   if (sourceMessage?.message_id) {
@@ -427,7 +440,7 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   // Nach der Bestätigung erhält Lyca_Support die fertige Rechnung ebenfalls.
   if (resolvedSupportChatId) {
     await sendMessage(resolvedSupportChatId,
-      `🧾 RECHNUNG – LYCA_SUPPORT\n\n${invoiceText(order)}\n\n💰 ZAHLUNG BESTÄTIGT\nTXID: ${order.transactionId || 'nicht angegeben'}\nBestätigt: ${order.paidAt}`,
+      `🧾 RECHNUNG – LYCA_SUPPORT\n\n${invoiceText(order)}\n\n💰 ZAHLUNG BESTÄTIGT\nTXID: ${txid}\nBestätigt: ${order.paidAt}`,
       { reply_markup: { inline_keyboard: [] } }
     );
   }
@@ -479,6 +492,12 @@ async function handleCallback(q) {
     const isAdmin = isAdminChat(chatId, actorUsername);
     if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Administrator freigeschaltet.');
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
+    if (!String(order.transactionId || '').trim()) {
+      return sendMessage(chatId,
+        `⛔ Zahlung kann noch nicht bestätigt werden.\\n\\nBestellung: ${order.orderNumber}\\nEs wurde noch keine TXID vom Kunden übermittelt.`,
+        { reply_markup: adminOrderKeyboard(order) }
+      );
+    }
     await markOrderPaid(order, chatId, q.message || null);
     return;
   }
