@@ -195,8 +195,16 @@ async function sendWalletQRCodes(chatId, order = null) {
 function orderKeyboard(order, admin = false) {
   if (order && admin) return adminOrderKeyboard(order);
   const rows = [];
-  if (order) rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)], [callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)], [urlButton('💬 Support kontaktieren', supportUrl(order))], [callback('🛒 Shop öffnen', 'products')]);
-  rows.push([webAppButton(), callback('↩️ Start', 'home')]);
+  if (order) {
+    rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)]);
+    if (order.paymentStatus !== 'BEZAHLT') {
+      rows.push([callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)]);
+      rows.push([callback('🔗 Transaktions-ID eingeben', 'txid_input:' + order.orderNumber)]);
+    } else {
+      rows.push([callback('🧾 Bezahlung abgeschlossen mit Rechnung', 'paid_invoice:' + order.orderNumber)]);
+    }
+    rows.push([urlButton('💬 Support kontaktieren', supportUrl(order))]);
+  }
   return { inline_keyboard: rows };
 }
 
@@ -256,7 +264,8 @@ async function sendOrder(order) {
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     const result = await sendMessage(customerChatId,
-      `✅ BESTELLUNG ERSTELLT\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnungsnummer: ${order.invoiceNumber}\n💶 Gesamt: ${formatMoney(order.total)}\n\nDie Zahlungs-Wallets folgen jetzt. Danach erscheint genau ein Button zur Meldung der Zahlung.`
+      `🧾 BESTELLUNG / RECHNUNG ERSTELLT\n\n${invoiceText(order)}\n\n📌 Zahlungsstatus: UNBEZAHLT\n\nBitte zuerst die Zahlung über einen der Wallets durchführen. Danach die Transaktions-ID über den Button eingeben. Erst Lyca_Support bestätigt die Zahlung.`,
+      { reply_markup: orderKeyboard(order) }
     );
     customerNotified = Boolean(result.ok);
     await sendWalletQRCodes(customerChatId, order);
@@ -481,7 +490,7 @@ async function handleCallback(q) {
     if (!wallets[coin]) return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
   }
-  if (data === 'checkout') return sendMessage(chatId, '🧾 Bitte öffne den Lyca-Webshop, um die Bestellung mit deinen Kontaktdaten abzuschließen.', { reply_markup: { inline_keyboard: [[webAppButton()], [callback('↩️ Start', 'home')]] } });
+  if (data === 'checkout') return sendMessage(chatId, '🧾 Die Bestellung wird direkt im Webshop mit deinen Kontaktdaten abgeschlossen. Nach dem Abschluss erhältst du hier sofort die Rechnung mit Status UNBEZAHLT.', { reply_markup: { inline_keyboard: [[webAppButton()]] } });
   if (data.startsWith('txid_input:')) {
     const order = getOrder(data.slice(12));
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
@@ -601,8 +610,7 @@ async function handleUpdate(update) {
     if (latestOrder) {
       return sendMessage(
         chatId,
-        '🛍️ LYCA WEBSHOP · BESTELLUNG\n\n' + formatOrder(latestOrder) +
-        '\n\n🧾 Die vollständige Rechnung / Bestellbestätigung ist hier im Bot verfügbar.',
+        `🧾 LYCA WEBSHOP · BESTELLUNG / RECHNUNG\n\n${invoiceText(latestOrder)}\n\n📌 Zahlungsstatus: ${latestOrder.paymentStatus === 'BEZAHLT' ? 'BEZAHLT' : 'UNBEZAHLT'}`,
         { reply_markup: orderKeyboard(latestOrder) }
       );
     }
