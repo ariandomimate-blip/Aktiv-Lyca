@@ -492,14 +492,14 @@ async function handleCallback(q) {
   }
   if (data === 'checkout') return sendMessage(chatId, '🧾 Die Bestellung wird direkt im Webshop mit deinen Kontaktdaten abgeschlossen. Nach dem Abschluss erhältst du hier sofort die Rechnung mit Status UNBEZAHLT.', { reply_markup: { inline_keyboard: [[webAppButton()]] } });
   if (data.startsWith('txid_input:')) {
-    const order = getOrder(data.slice(12));
+    const order = getOrder(data.slice(11));
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     if (order.paymentStatus === 'BEZAHLT') return sendMessage(chatId, `Die Bestellung ${order.orderNumber} ist bereits als bezahlt bestätigt.`);
     const session = getSession(chatId);
     session.pendingPaymentOrder = order.orderNumber;
     return sendMessage(chatId,
-      `🔗 TX-ID EINGEBEN\n\nBestellung: ${order.orderNumber}\n\nBitte sende jetzt die vollständige Transaktions-ID / TXID als nächste Nachricht.\n\nDanach wird sie direkt an Lyca_Support zur Prüfung weitergeleitet.`,
-      { reply_markup: { force_reply: true, input_field_placeholder: 'Transaktions-ID / TXID' } }
+      `🔗 TRANSAKTIONS-ID EINGEBEN\n\nBestellung: ${order.orderNumber}\nRechnungsnummer: ${order.invoiceNumber}\nBetrag: ${formatMoney(order.total)}\n\nBitte gib jetzt die vollständige Transaktions-ID / TXID in das Eingabefeld ein und sende sie mit dem Senden-Pfeil ab.\n\n⚠️ Erst nach dem Absenden wird die TXID gespeichert und an Lyca_Support zur Prüfung weitergeleitet.`,
+      { reply_markup: { force_reply: true, input_field_placeholder: 'TXID / Transaktions-ID eingeben' } }
     );
   }
 
@@ -579,7 +579,7 @@ async function handleUpdate(update) {
       order.paymentReportedAt = new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'});
       session.pendingPaymentOrder = null;
 
-      const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG DURCH LYCA_SUPPORT\\n\\n${formatOrder(order)}\\n\\n🔗 Transaktions-ID / TXID:\\n${order.transactionId}\\n\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}\\n\\nBitte TXID prüfen und anschließend „✅ Zahlung bestätigen“ drücken. Erst dann wird die Rechnung an Kunde und Support gesendet.`;
+      const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG DURCH LYCA_SUPPORT\\n\\n🧾 RECHNUNG / BESTELLBESTÄTIGUNG\\n${invoiceText(order)}\\n\\n📌 Zahlungsstatus: UNBEZAHLT\\n🔗 Transaktions-ID / TXID: ${order.transactionId}\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}\\n\\nBitte die TXID prüfen. Erst nach „✅ Zahlung bestätigen“ wird die Rechnung bei Kunde und Lyca_Support auf BEZAHLT aktualisiert.`;
       const recipients = supportAdminOnly
         ? (resolvedSupportChatId ? [String(resolvedSupportChatId)] : (isSupportAdmin ? [String(chatId)] : []))
         : (supportChatId ? [String(supportChatId)] : Array.from(adminChatIds));
@@ -589,7 +589,7 @@ async function handleUpdate(update) {
       if (!recipients.length) {
         return sendMessage(chatId, '⚠️ TXID gespeichert, aber Lyca_Support ist noch nicht als Administrator erreichbar.');
       }
-      return sendMessage(chatId, `⏳ TX-ID ÜBERMITTELT\\n\\nBestellung: ${order.orderNumber}\\nTXID: ${order.transactionId}\\n\\nDie Transaktions-ID wurde direkt an @${supportUsername} zur Prüfung gesendet. Nach der Bestätigung erhältst du automatisch die Rechnung.`);
+      return sendMessage(chatId, `⏳ TX-ID ÜBERMITTELT\\n\\nBestellung: ${order.orderNumber}\\nRechnungsnummer: ${order.invoiceNumber}\\nTXID: ${order.transactionId}\\nZahlungsstatus: UNBEZAHLT\\n\\nDie Transaktions-ID wurde direkt an @${supportUsername} zur Prüfung gesendet. Lyca_Support muss die Zahlung zuerst bestätigen. Danach erhältst du automatisch die aktualisierte Rechnung mit TXID und Status BEZAHLT.`);
     }
     session.pendingPaymentOrder = null;
   }
