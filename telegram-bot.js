@@ -519,7 +519,7 @@ async function handleCallback(q) {
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     if (!String(order.transactionId || '').trim()) {
       return sendMessage(chatId,
-        `⛔ Zahlung kann noch nicht bestätigt werden.\\n\\nBestellung: ${order.orderNumber}\\nEs wurde noch keine TXID vom Kunden übermittelt.`,
+        `⛔ Zahlung kann noch nicht bestätigt werden.\n\nBestellung: ${order.orderNumber}\nEs wurde noch keine TXID vom Kunden übermittelt.`,
         { reply_markup: adminOrderKeyboard(order) }
       );
     }
