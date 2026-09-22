@@ -12,6 +12,9 @@ const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
+// Lyca_Support is the sole application administrator. Telegram bot ownership is
+// intentionally separate: this role controls the webshop admin panel and payment confirmations.
+const supportAdminOnly = String(process.env.LYCA_SUPPORT_ADMIN_ONLY || 'true').toLowerCase() !== 'false';
 // If no separate administrator chat is configured, keep Support as the emergency recipient
 // so orders are not lost. When TELEGRAM_ADMIN_CHAT_IDS is configured, Support receives
 // the complete order only after the administrator confirms payment.
@@ -43,7 +46,11 @@ function rememberOnce(map, key, ttlMs = 10 * 60 * 1000) {
   return true;
 }
 function isAdminChat(chatId, username = '') {
-  return adminChatIds.has(String(chatId)) || String(username || '').replace(/^@/, '').toLowerCase() === supportUsername.toLowerCase();
+  const id = String(chatId || '');
+  const user = String(username || '').replace(/^@/, '').toLowerCase();
+  const isSupport = id === supportChatId || user === supportUsername.toLowerCase();
+  if (supportAdminOnly) return isSupport;
+  return adminChatIds.has(id) || isSupport;
 }
 
 const products = {
@@ -228,7 +235,9 @@ function productText() {
 
 async function sendOrder(order) {
   saveOrder(order);
-  const recipients = Array.from(adminChatIds);
+  const recipients = supportAdminOnly
+    ? (supportChatId ? [supportChatId] : Array.from(adminChatIds).filter(id => id === supportChatId))
+    : Array.from(adminChatIds);
   for (const chatId of recipients) {
     try {
       const result = await sendMessage(chatId, formatOrder(order), { reply_markup: adminOrderKeyboard(order) });
@@ -509,7 +518,7 @@ async function handleUpdate(update) {
   const parts = text.split(/\s+/);
   const command = parts[0].split('@')[0];
   const senderUsername = String(msg.from?.username || '').replace(/^@/, '');
-  const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase() || adminChatIds.has(String(chatId));
+  const isSupportAdmin = isAdminChat(chatId, senderUsername);
   if (isSupportAdmin) adminChatIds.add(String(chatId));
   const session = getSession(chatId);
 
@@ -526,7 +535,9 @@ async function handleUpdate(update) {
       session.pendingPaymentOrder = null;
 
       const notice = `🔔 ZAHLUNG GEMELDET – PRÜFUNG DURCH LYCA_SUPPORT\\n\\n${formatOrder(order)}\\n\\n🔗 Transaktions-ID / TXID:\\n${order.transactionId}\\n\\n🕒 Kunde meldete Zahlung: ${order.paymentReportedAt}\\n\\nBitte TXID prüfen und anschließend „✅ Zahlung bestätigen“ drücken. Erst dann wird die Rechnung an Kunde und Support gesendet.`;
-      const recipients = supportChatId ? [String(supportChatId)] : Array.from(adminChatIds);
+      const recipients = supportAdminOnly
+        ? (supportChatId ? [String(supportChatId)] : (isSupportAdmin ? [String(chatId)] : []))
+        : (supportChatId ? [String(supportChatId)] : Array.from(adminChatIds));
       for (const adminId of recipients) {
         await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
       }
