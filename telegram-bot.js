@@ -276,6 +276,11 @@ async function getBusinessConnection(connectionId) {
   return null;
 }
 async function handleBusinessMessage(msg) {
+  // Telegram sends business_message updates for messages sent on behalf of the
+  // connected account as well. Never answer those again or the bot can loop and
+  // hit Telegram's rate limit (the observed duplicate-message problem).
+  if (msg.sender_business_bot) return;
+  if (msg.from?.is_bot) return;
   const connectionId = String(msg.business_connection_id || '');
   if (!connectionId || !msg.chat) return;
   const connection = await getBusinessConnection(connectionId);
