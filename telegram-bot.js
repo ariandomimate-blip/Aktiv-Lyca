@@ -70,9 +70,9 @@ function formatOrder(order) {
   return `🛒 LYCA WEBSHOP · NEUE BESTELLUNG\n\n🔢 Bestellnummer: ${order.orderNumber}\n🧾 Rechnung: ${order.invoiceNumber}\n📅 ${order.createdAt}\n\n👤 KUNDE\n${order.customer.name}\n${order.customer.address}\n${order.customer.email}\n\n📦 BESTELLUNG\n${lines}\n\n💶 Gesamt: ${formatMoney(order.total)}\n📌 Zahlungsstatus: ${order.paymentStatus}\n\n📩 Support: @${supportUsername}`;
 }
 function invoiceText(order) {
-  const txLine = order.transactionId ? `\\nTransaktions-ID / TXID: ${order.transactionId}` : '';
-  const paidLine = order.paidAt ? `\\nBestätigt: ${order.paidAt}` : '';
-  return `🧾 LYCA WEBSHOP · RECHNUNG / BESTELLBESTÄTIGUNG\\n\\nRechnungsnummer: ${order.invoiceNumber}\\nBestellnummer: ${order.orderNumber}\\nDatum: ${order.createdAt}\\n\\nKunde: ${order.customer.name}\\nAdresse: ${order.customer.address}\\nE-Mail: ${order.customer.email}\\n\\n${order.items.map(x => \`• ${x.name} | Menge: ${x.qty} | ${formatMoney(x.price)} / Stück\`).join('\\n')}\\n\\nGesamt: ${formatMoney(order.total)}\\nZahlungsstatus: ${order.paymentStatus}${txLine}${paidLine}\\n\\nSupport: @${supportUsername}`;
+  const txLine = order.transactionId ? `\nTransaktions-ID / TXID: ${order.transactionId}` : '';
+  const paidLine = order.paidAt ? `\nBestätigt: ${order.paidAt}` : '';
+  return `🧾 LYCA WEBSHOP · RECHNUNG / BESTELLBESTÄTIGUNG\n\nRechnungsnummer: ${order.invoiceNumber}\nBestellnummer: ${order.orderNumber}\nDatum: ${order.createdAt}\n\nKunde: ${order.customer.name}\nAdresse: ${order.customer.address}\nE-Mail: ${order.customer.email}\n\n${order.items.map(x => `• ${x.name} | Menge: ${x.qty} | ${formatMoney(x.price)} / Stück`).join('\n')}\n\nGesamt: ${formatMoney(order.total)}\nZahlungsstatus: ${order.paymentStatus}${txLine}${paidLine}\n\nSupport: @${supportUsername}`;
 }
 function paidInvoiceKeyboard(order) {
   return { inline_keyboard: [
@@ -440,8 +440,7 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     await sendMessage(customerChatId,
-      `✅ ZAHLUNG BESTÄTIGT\n\nBestellnummer: ${order.orderNumber}\nRechnungsnummer: ${order.invoiceNumber}\nGesamt: ${formatMoney(order.total)}\n\nDie Zahlung wurde vom Administrator bestätigt.\n\n🧾 RECHNUNG\n${invoiceText(order)}`
-,
+      `✅ ZAHLUNG BESTÄTIGT\n\nBestellnummer: ${order.orderNumber}\nRechnungsnummer: ${order.invoiceNumber}\nGesamt: ${formatMoney(order.total)}\n\nDie Zahlung wurde vom Administrator bestätigt.\n\n🧾 RECHNUNG\n${invoiceText(order)}`,
       { reply_markup: paidInvoiceKeyboard(order) }
     );
   }
