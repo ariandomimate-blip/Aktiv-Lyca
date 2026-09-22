@@ -29,6 +29,22 @@ const orders = new Map();
 const sessions = new Map();
 const businessConnections = new Map();
 const businessConnectionUsers = new Map();
+// Telegram may retry webhook deliveries. Keep a short in-process idempotency cache
+// so one update can never create duplicate bot replies/orders.
+const seenUpdateIds = new Map();
+const seenCallbackIds = new Map();
+function rememberOnce(map, key, ttlMs = 10 * 60 * 1000) {
+  const now = Date.now();
+  for (const [k, expires] of map) if (expires <= now) map.delete(k);
+  const k = String(key || '');
+  if (!k) return true;
+  if (map.has(k)) return false;
+  map.set(k, now + ttlMs);
+  return true;
+}
+function isAdminChat(chatId, username = '') {
+  return adminChatIds.has(String(chatId)) || String(username || '').replace(/^@/, '').toLowerCase() === supportUsername.toLowerCase();
+}
 
 const products = {
   lyca: {
@@ -291,6 +307,79 @@ async function showCart(chatId, messageId = null) {
   if (messageId) return editMessage(chatId, messageId, text, markup);
   return sendMessage(chatId, text, { reply_markup: markup });
 }
+function adminPanelKeyboard() {
+  return { inline_keyboard: [
+    [callback('📥 Offene Zahlungen', 'admin:pending'), callback('📋 Bestellungen', 'admin:orders')],
+    [callback('🔄 Aktualisieren', 'admin:panel'), callback('📡 Bot-Status', 'admin:status')],
+    [callback('💳 Wallets', 'wallets'), callback('↩️ Start', 'home')]
+  ] };
+}
+function adminPanelText(chatId) {
+  const all = Array.from(orders.values());
+  const pending = all.filter(o => o.paymentStatus !== 'BEZAHLT' && o.transactionId);
+  const awaitingTx = all.filter(o => o.paymentStatus !== 'BEZAHLT' && !o.transactionId);
+  const connections = Array.from(businessConnections.values()).filter(c => c.is_enabled !== false).length;
+  return '🛠️ LYCA_SUPPORT · ADMINISTRATOR-PANEL\n\n' +
+    '👤 Administrator: @' + supportUsername + '\n' +
+    '🆔 Chat-ID: ' + chatId + '\n\n' +
+    '📦 Bestellungen im Speicher: ' + all.length + '\n' +
+    '🔗 TX-ID zur Prüfung: ' + pending.length + '\n' +
+    '⏳ Noch ohne TX-ID: ' + awaitingTx.length + '\n' +
+    '🏢 Business-Verbindungen: ' + connections + '\n\n' +
+    'Wähle eine Funktion:';
+}
+async function showAdminPanel(chatId, messageId = null) {
+  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+  const text = adminPanelText(chatId);
+  if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
+  return sendMessage(chatId, text, { reply_markup: adminPanelKeyboard() });
+}
+async function showAdminPending(chatId, messageId = null) {
+  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+  const pending = Array.from(orders.values()).filter(o => o.paymentStatus !== 'BEZAHLT' && o.transactionId);
+  if (!pending.length) {
+    const text = '📥 OFFENE ZAHLUNGSPRÜFUNGEN\n\nAktuell liegt keine Zahlung mit übermittelter TX-ID zur Prüfung vor.';
+    if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
+    return sendMessage(chatId, text, { reply_markup: adminPanelKeyboard() });
+  }
+  const text = '📥 OFFENE ZAHLUNGSPRÜFUNGEN\n\n' + pending.map(o =>
+    '🔢 ' + o.orderNumber + '\n💶 ' + formatMoney(o.total) + '\n🔗 TXID: ' + o.transactionId + '\n👤 ' + o.customer.name
+  ).join('\n\n');
+  const rows = pending.map(o => [callback('✅ Zahlung bestätigen · ' + o.orderNumber, 'paid:' + o.orderNumber)]);
+  rows.push([callback('↩️ Admin-Panel', 'admin:panel')]);
+  const markup = { inline_keyboard: rows };
+  if (messageId) return editMessage(chatId, messageId, text, markup);
+  return sendMessage(chatId, text, { reply_markup: markup });
+}
+async function showAdminOrders(chatId, messageId = null) {
+  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+  const all = Array.from(orders.values()).slice(-20).reverse();
+  const text = all.length
+    ? '📋 LETZTE BESTELLUNGEN\n\n' + all.map(o =>
+        '🔢 ' + o.orderNumber + ' · ' + o.paymentStatus + '\n💶 ' + formatMoney(o.total) + '\n👤 ' + o.customer.name
+      ).join('\n\n')
+    : '📋 BESTELLUNGEN\n\nNoch keine Bestellungen im aktuellen Serverprozess.';
+  const rows = all.filter(o => o.paymentStatus !== 'BEZAHLT' && o.transactionId)
+    .map(o => [callback('✅ Zahlung bestätigen · ' + o.orderNumber, 'paid:' + o.orderNumber)]);
+  rows.push([callback('↩️ Admin-Panel', 'admin:panel')]);
+  const markup = { inline_keyboard: rows };
+  if (messageId) return editMessage(chatId, messageId, text, markup);
+  return sendMessage(chatId, text, { reply_markup: markup });
+}
+async function showAdminStatus(chatId, messageId = null) {
+  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+  const me = await api('getMe');
+  const hook = await api('getWebhookInfo');
+  const text = '📡 LYCA BOT · STATUS\n\n' +
+    '🤖 Bot: @' + botUsername + '\n' +
+    '🔐 API: ' + (me.ok ? 'OK' : 'FEHLER') + '\n' +
+    '🪝 Webhook: ' + (hook.ok && hook.result?.url ? hook.result.url : 'nicht gesetzt') + '\n' +
+    '📨 Warteschlange: ' + (hook.ok ? (hook.result?.pending_update_count || 0) : 'unbekannt') + '\n' +
+    '🏢 Business: ' + (me.ok && me.result?.can_connect_to_business ? 'bereit' : 'nicht freigeschaltet');
+  if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
+  return sendMessage(chatId, text, { reply_markup: adminPanelKeyboard() });
+}
+
 async function showOrders(chatId, messageId = null) {
   const session = getSession(chatId);
   const order = session.lastOrder ? getOrder(session.lastOrder) : null;
@@ -330,6 +419,7 @@ async function markOrderPaid(order, actorChatId, sourceMessage = null) {
   return true;
 }
 async function handleCallback(q) {
+  if (!rememberOnce(seenCallbackIds, q.id, 10 * 60 * 1000)) return;
   await api('answerCallbackQuery', { callback_query_id: q.id });
   const chatId = q.message?.chat?.id;
   const messageId = q.message?.message_id;
@@ -341,6 +431,10 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
+  if (data === 'admin:panel') return showAdminPanel(chatId, messageId);
+  if (data === 'admin:pending') return showAdminPending(chatId, messageId);
+  if (data === 'admin:orders') return showAdminOrders(chatId, messageId);
+  if (data === 'admin:status') return showAdminStatus(chatId, messageId);
   if (data === 'wallets') return sendWalletQRCodes(chatId, null);
   if (data.startsWith('wallets:')) {
     const order = getOrder(data.slice(8));
@@ -367,7 +461,7 @@ async function handleCallback(q) {
   if (data.startsWith('paid:')) {
     const order = getOrder(data.slice(5));
     const actorUsername = String(q.from?.username || '').replace(/^@/, '');
-    const isAdmin = adminChatIds.has(String(chatId));
+    const isAdmin = isAdminChat(chatId, actorUsername);
     if (!isAdmin) return sendMessage(chatId, '⛔ Diese Aktion ist nur für den Lyca Administrator freigeschaltet.');
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
     await markOrderPaid(order, chatId, q.message || null);
@@ -392,6 +486,7 @@ async function handleCallback(q) {
 }
 
 async function handleUpdate(update) {
+  if (update.update_id != null && !rememberOnce(seenUpdateIds, update.update_id, 10 * 60 * 1000)) return;
   if (update.business_connection) { await handleBusinessConnection(update.business_connection); return; }
   if (update.business_message) { await handleBusinessMessage(update.business_message); return; }
   if (update.edited_business_message || update.deleted_business_messages) return;
@@ -409,7 +504,7 @@ async function handleUpdate(update) {
   const parts = text.split(/\s+/);
   const command = parts[0].split('@')[0];
   const senderUsername = String(msg.from?.username || '').replace(/^@/, '');
-  const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase();
+  const isSupportAdmin = senderUsername.toLowerCase() === supportUsername.toLowerCase() || adminChatIds.has(String(chatId));
   if (isSupportAdmin) adminChatIds.add(String(chatId));
   const session = getSession(chatId);
 
@@ -438,6 +533,7 @@ async function handleUpdate(update) {
     session.pendingPaymentOrder = null;
   }
 
+  if (command === '/admin') return showAdminPanel(chatId);
   if (command === '/start') {
     const startParam = String(parts[1] || '').trim();
     if (startParam.toLowerCase() === 'wallets') {
@@ -461,8 +557,8 @@ async function handleUpdate(update) {
     if (isSupportAdmin) {
       return sendMessage(
         chatId,
-        '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden automatisch an die registrierten Administratoren weitergeleitet.\n\n🆔 Deine Chat-ID: ' + chatId,
-        { reply_markup: mainKeyboard() }
+        '🛠️ LYCA SUPPORT · ADMIN\n\nDu bist als Support-Administrator verbunden. Neue Webshop-Bestellungen werden automatisch an dich zur Zahlungsprüfung weitergeleitet.\n\n🆔 Deine Chat-ID: ' + chatId + '\n\nÖffne jetzt das Administrator-Panel für offene TX-ID-Prüfungen und Bestellungen.',
+        { reply_markup: adminPanelKeyboard() }
       );
     }
     return showHome(chatId);
@@ -503,7 +599,7 @@ async function configure(baseUrl = publicBaseUrl) {
   } catch {}
   if (baseUrl) {
     const webhookUrl = `${baseUrl}/api/telegram-webhook`;
-    const body = { url: webhookUrl, allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'], drop_pending_updates: false };
+    const body = { url: webhookUrl, allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'], drop_pending_updates: true };
     if (webhookSecret) body.secret_token = webhookSecret;
     const hook = await api('setWebhook', body);
     if (!hook.ok) return { enabled: false, reason: hook.description || 'setWebhook failed' };
