@@ -75,9 +75,8 @@ $('#checkoutForm').onsubmit=async e=>{
     const openOrderBtn=document.getElementById('openTelegramOrder');
     if(openOrderBtn)openOrderBtn.onclick=()=>openTelegramSupport(botUrl,orderNumber);
     e.target.reset();
-    // Open the verified bot deep link after the success UI is painted.
-    // The bot URL is generated from Telegram getMe() on the server.
-    setTimeout(()=>openTelegramSupport(botUrl),350);
+    // iOS blocks automatic app handoff after an asynchronous checkout request.
+    // The customer now taps the Telegram button, which preserves the user gesture.
   }catch(err){
     console.error('Lyca checkout error:',err);
     const msg=String(err?.message||err||'Unbekannter Fehler');
