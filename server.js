@@ -29,6 +29,18 @@ const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://webshop-s
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
+const pageStats = { totalViews:0, sessionViews:0, byDay:new Map() };
+function recordPageView() {
+  pageStats.totalViews += 1;
+  pageStats.sessionViews += 1;
+  const day = new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Berlin'});
+  pageStats.byDay.set(day, (pageStats.byDay.get(day) || 0) + 1);
+}
+function getPageStats() {
+  const day = new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Berlin'});
+  return { totalViews:pageStats.totalViews, sessionViews:pageStats.sessionViews, todayViews:pageStats.byDay.get(day) || 0 };
+}
+telegram.setStatsProvider(getPageStats);
 const BOT_INVITE_URL = () => `https://t.me/${encodeURIComponent(telegram.getUsername ? telegram.getUsername() : telegram.username)}`;
 const mimeTypes = {
   '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8',
@@ -297,8 +309,8 @@ const server = http.createServer(async (req,res) => {
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
 
-  // Always serve the homepage explicitly. This avoids a false 404 when the root path is requested by Telegram/Safari.
-  if (req.method === 'GET' && (route === '/' || route === '/index.html')) return sendFile(path.join(root,'index.html'),res);
+  // Count homepage visits for the Lyca Support admin panel.
+  if (req.method === 'GET' && (route === '/' || route === '/index.html')) { recordPageView(); return sendFile(path.join(root,'index.html'),res); }
   let filePath;
   try { filePath = safePath(req.url || '/'); } catch { res.writeHead(400); return res.end('Bad Request'); }
   if (!filePath) { res.writeHead(403); return res.end('Forbidden'); }
