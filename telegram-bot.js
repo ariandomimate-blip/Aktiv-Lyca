@@ -359,14 +359,14 @@ function adminPanelText(chatId) {
     '🏢 Business-Verbindungen: ' + connections + '\n\n' +
     'Wähle eine Funktion:';
 }
-async function showAdminPanel(chatId, messageId = null) {
-  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+async function showAdminPanel(chatId, messageId = null, actorUsername = '') {
+  if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
   const text = adminPanelText(chatId);
   if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
   return sendMessage(chatId, text, { reply_markup: adminPanelKeyboard() });
 }
-async function showAdminPending(chatId, messageId = null) {
-  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+async function showAdminPending(chatId, messageId = null, actorUsername = '') {
+  if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
   const pending = Array.from(orders.values()).filter(o => o.paymentStatus !== 'BEZAHLT' && o.transactionId);
   if (!pending.length) {
     const text = '📥 OFFENE ZAHLUNGSPRÜFUNGEN\n\nAktuell liegt keine Zahlung mit übermittelter TX-ID zur Prüfung vor.';
@@ -382,8 +382,8 @@ async function showAdminPending(chatId, messageId = null) {
   if (messageId) return editMessage(chatId, messageId, text, markup);
   return sendMessage(chatId, text, { reply_markup: markup });
 }
-async function showAdminOrders(chatId, messageId = null) {
-  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+async function showAdminOrders(chatId, messageId = null, actorUsername = '') {
+  if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
   const all = Array.from(orders.values()).slice(-20).reverse();
   const text = all.length
     ? '📋 LETZTE BESTELLUNGEN\n\n' + all.map(o =>
@@ -397,8 +397,8 @@ async function showAdminOrders(chatId, messageId = null) {
   if (messageId) return editMessage(chatId, messageId, text, markup);
   return sendMessage(chatId, text, { reply_markup: markup });
 }
-async function showAdminStatus(chatId, messageId = null) {
-  if (!isAdminChat(chatId)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+async function showAdminStatus(chatId, messageId = null, actorUsername = '') {
+  if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
   const me = await api('getMe');
   const hook = await api('getWebhookInfo');
   const text = '📡 LYCA BOT · STATUS\n\n' +
@@ -476,10 +476,11 @@ async function handleCallback(q) {
   if (data === 'cart') return showCart(chatId, messageId);
   if (data === 'cart:clear') { clearCart(chatId); return showCart(chatId, messageId); }
   if (data === 'orders') return showOrders(chatId, messageId);
-  if (data === 'admin:panel') return showAdminPanel(chatId, messageId);
-  if (data === 'admin:pending') return showAdminPending(chatId, messageId);
-  if (data === 'admin:orders') return showAdminOrders(chatId, messageId);
-  if (data === 'admin:status') return showAdminStatus(chatId, messageId);
+  const callbackUsername = String(q.from?.username || '').replace(/^@/, '');
+  if (data === 'admin:panel') return showAdminPanel(chatId, messageId, callbackUsername);
+  if (data === 'admin:pending') return showAdminPending(chatId, messageId, callbackUsername);
+  if (data === 'admin:orders') return showAdminOrders(chatId, messageId, callbackUsername);
+  if (data === 'admin:status') return showAdminStatus(chatId, messageId, callbackUsername);
   if (data === 'wallets') return sendWalletQRCodes(chatId, null);
   if (data.startsWith('wallets:')) {
     const order = getOrder(data.slice(8));
@@ -564,7 +565,10 @@ async function handleUpdate(update) {
   const command = parts[0].split('@')[0];
   const senderUsername = String(msg.from?.username || '').replace(/^@/, '');
   const isSupportAdmin = isAdminChat(chatId, senderUsername);
-  if (isSupportAdmin) adminChatIds.add(String(chatId));
+  if (isSupportAdmin) {
+    adminChatIds.add(String(chatId));
+    resolvedSupportChatId = String(chatId);
+  }
   const session = getSession(chatId);
 
   // Customer must provide the transaction ID before the administrator can review the payment.
@@ -606,7 +610,10 @@ async function handleUpdate(update) {
       .filter(o => String(o.telegramChatId || '') === String(chatId))
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
     session.lastOrder = latestOrder?.orderNumber || session.lastOrder || null;
-    if (isSupportAdmin) adminChatIds.add(String(chatId));
+    if (isSupportAdmin) {
+      adminChatIds.add(String(chatId));
+      resolvedSupportChatId = String(chatId);
+    }
     if (latestOrder) {
       return sendMessage(
         chatId,
