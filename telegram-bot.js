@@ -30,6 +30,7 @@ const wallets = {
 };
 
 const orders = new Map();
+let statsProvider = null;
 const sessions = new Map();
 const businessConnections = new Map();
 const businessConnectionUsers = new Map();
@@ -339,9 +340,11 @@ async function showCart(chatId, messageId = null) {
   return sendMessage(chatId, text, { reply_markup: markup });
 }
 function adminPanelKeyboard() {
+
   return { inline_keyboard: [
     [callback('📥 Offene Zahlungen', 'admin:pending'), callback('📋 Bestellungen', 'admin:orders')],
-    [callback('🔄 Aktualisieren', 'admin:panel'), callback('📡 Bot-Status', 'admin:status')],
+    [callback('🔄 Aktualisieren', 'admin:panel'), callback('📊 Seitenaufrufe', 'admin:stats')],
+    [callback('📡 Bot-Status', 'admin:status')],
     [callback('💳 Wallets', 'wallets'), callback('↩️ Start', 'home')]
   ] };
 }
@@ -396,6 +399,15 @@ async function showAdminOrders(chatId, messageId = null, actorUsername = '') {
   const markup = { inline_keyboard: rows };
   if (messageId) return editMessage(chatId, messageId, text, markup);
   return sendMessage(chatId, text, { reply_markup: markup });
+}
+async function showAdminStats(chatId, messageId = null, actorUsername = '') {
+  if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
+  const stats = typeof statsProvider === 'function' ? await statsProvider() : null;
+  const text = stats
+    ? '📊 LYCA WEBSHOP · SEITENAUFRUFE\\n\\n👁️ Gesamtaufrufe: ' + Number(stats.totalViews || 0) + '\\n📅 Heute: ' + Number(stats.todayViews || 0) + '\\n🕒 Seit Serverstart: ' + Number(stats.sessionViews || 0)
+    : '📊 Seitenaufrufe sind noch nicht verbunden.';
+  if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
+  return sendMessage(chatId, text, { reply_markup: adminPanelKeyboard() });
 }
 async function showAdminStatus(chatId, messageId = null, actorUsername = '') {
   if (!isAdminChat(chatId, actorUsername)) return sendMessage(chatId, '⛔ Nur Lyca_Support ist als Administrator freigeschaltet.');
@@ -480,6 +492,7 @@ async function handleCallback(q) {
   if (data === 'admin:panel') return showAdminPanel(chatId, messageId, callbackUsername);
   if (data === 'admin:pending') return showAdminPending(chatId, messageId, callbackUsername);
   if (data === 'admin:orders') return showAdminOrders(chatId, messageId, callbackUsername);
+  if (data === 'admin:stats') return showAdminStats(chatId, messageId, callbackUsername);
   if (data === 'admin:status') return showAdminStatus(chatId, messageId, callbackUsername);
   if (data === 'wallets') return sendWalletQRCodes(chatId, null);
   if (data.startsWith('wallets:')) {
@@ -694,6 +707,7 @@ module.exports = {
   sendOrder,
   handleUpdate,
   configure,
+  setStatsProvider: (fn) => { statsProvider = fn; },
   getOrder,
   getOrders: () => Array.from(orders.values()),
   invoiceText,
