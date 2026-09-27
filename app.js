@@ -22,9 +22,9 @@ function telegramBotUri(orderNumber){const param=encodeURIComponent(String(order
 function openTelegramSupport(url, orderNumber=''){
   if(!url)return;
   const target=String(url).trim();
-  const deepLink=orderNumber ? telegramBotUri(orderNumber) : target;
-  // Inside the Telegram in-app browser, a tg:// link is the most direct handoff
-  // to the Telegram app. This function is also called by a real user tap.
+  // Keep the real Telegram HTTPS deep link. On iOS, a user-initiated
+  // navigation to https://t.me/... is the most reliable way to hand off
+  // from Safari to the installed Telegram app.
   try{
     const tg=window.Telegram?.WebApp;
     if(tg?.openTelegramLink && target.startsWith('https://t.me/')){
@@ -33,12 +33,12 @@ function openTelegramSupport(url, orderNumber=''){
     }
   }catch(err){console.warn('Telegram WebApp handoff failed:',err)}
   try{
-    window.location.href=deepLink;
-    // Some iOS browsers ignore custom schemes. Keep the verified HTTPS link
-    // as a fallback after a short delay.
-    setTimeout(()=>{try{window.location.href=target}catch{}},900);
-  }catch{
-    try{window.location.href=target}catch{}
+    // This runs directly from the customer's button tap, preserving the
+    // iOS user gesture required to open Telegram.
+    window.location.assign(target);
+  }catch(err){
+    console.warn('Telegram browser handoff failed:',err);
+    try{ window.open(target,'_blank','noopener,noreferrer'); }catch{}
   }
 }
 
