@@ -21,22 +21,23 @@ function telegramBotUrl(orderNumber){const param=encodeURIComponent(String(order
 function telegramBotUri(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'tg://resolve?domain='+TELEGRAM_BOT_USERNAME+'&start='+param}
 function openTelegramSupport(url){
   if(!url)return;
-  // In a Telegram Mini App, use Telegram's native link handler.
-  // window.location.assign() keeps navigation inside the Mini App WebView
-  // and can produce "Dieser Nutzer scheint leider nicht zu existieren".
+  const target=String(url).trim();
+  // First choice inside Telegram: hand the deep link to Telegram itself.
   try{
     const tg=window.Telegram?.WebApp;
     if(tg?.openTelegramLink){
-      tg.openTelegramLink(String(url));
-      return;
-    }
-    if(tg?.openLink){
-      tg.openLink(String(url),{try_instant_view:false});
+      tg.openTelegramLink(target);
       return;
     }
   }catch(err){console.warn('Telegram native link failed:',err)}
-  try{window.open(String(url),'_blank','noopener,noreferrer')}
-  catch{try{window.location.href=String(url)}catch{}}
+  // Do not use window.open() here: in Telegram/iOS it can silently open
+  // a new WebView without handing the deep link to the Telegram app.
+  // A direct navigation lets t.me resolve the bot deep link.
+  try{
+    window.location.assign(target);
+  }catch{
+    try{window.location.href=target}catch{}
+  }
 }
 window.addLycaProduct=qty=>add(1,qty);
 $('#cartOpen').onclick=openCart;
