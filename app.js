@@ -19,26 +19,29 @@ async function resolveTelegramBotUsername(){
 }
 function telegramBotUrl(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'https://t.me/'+TELEGRAM_BOT_USERNAME+'?start='+param}
 function telegramBotUri(orderNumber){const param=encodeURIComponent(String(orderNumber||''));return 'tg://resolve?domain='+TELEGRAM_BOT_USERNAME+'&start='+param}
-function openTelegramSupport(url){
+function openTelegramSupport(url, orderNumber=''){
   if(!url)return;
   const target=String(url).trim();
-  // First choice inside Telegram: hand the deep link to Telegram itself.
+  const deepLink=orderNumber ? telegramBotUri(orderNumber) : target;
+  // Inside the Telegram in-app browser, a tg:// link is the most direct handoff
+  // to the Telegram app. This function is also called by a real user tap.
   try{
     const tg=window.Telegram?.WebApp;
-    if(tg?.openTelegramLink){
+    if(tg?.openTelegramLink && target.startsWith('https://t.me/')){
       tg.openTelegramLink(target);
       return;
     }
-  }catch(err){console.warn('Telegram native link failed:',err)}
-  // Do not use window.open() here: in Telegram/iOS it can silently open
-  // a new WebView without handing the deep link to the Telegram app.
-  // A direct navigation lets t.me resolve the bot deep link.
+  }catch(err){console.warn('Telegram WebApp handoff failed:',err)}
   try{
-    window.location.assign(target);
+    window.location.href=deepLink;
+    // Some iOS browsers ignore custom schemes. Keep the verified HTTPS link
+    // as a fallback after a short delay.
+    setTimeout(()=>{try{window.location.href=target}catch{}},900);
   }catch{
     try{window.location.href=target}catch{}
   }
 }
+
 window.addLycaProduct=qty=>add(1,qty);
 $('#cartOpen').onclick=openCart;
 $('#cartClose').onclick=closeAll;
@@ -70,7 +73,7 @@ $('#checkoutForm').onsubmit=async e=>{
     const copyBtn=document.getElementById('copyInvoice');
     if(copyBtn)copyBtn.onclick=async()=>{try{await navigator.clipboard.writeText(invoiceText);copyBtn.textContent='✓ Rechnung kopiert';}catch{alert('Rechnung konnte nicht automatisch kopiert werden.')}};
     const openOrderBtn=document.getElementById('openTelegramOrder');
-    if(openOrderBtn)openOrderBtn.onclick=()=>openTelegramSupport(botUrl);
+    if(openOrderBtn)openOrderBtn.onclick=()=>openTelegramSupport(botUrl,orderNumber);
     e.target.reset();
     // Open the verified bot deep link after the success UI is painted.
     // The bot URL is generated from Telegram getMe() on the server.
