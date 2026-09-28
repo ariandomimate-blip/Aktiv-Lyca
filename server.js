@@ -62,6 +62,85 @@ function parseJson(req) {
     req.on('error', reject);
   });
 }
+
+function parseUrlEncoded(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; if (body.length > 1000000) req.destroy(new Error('Payload too large')); });
+    req.on('end', () => {
+      try {
+        const params = new URLSearchParams(body || '');
+        const data = Object.fromEntries(params.entries());
+        if (data.items) data.items = JSON.parse(data.items);
+        resolve(data);
+      } catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
+async function createTelegramOrder(data) {
+  const customer = data.customer || {
+    name: String(data.customer_name || '').trim(),
+    email: String(data.customer_email || '').trim(),
+    address: String(data.customer_address || '').trim()
+  };
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (!customer.name || !customer.email || !customer.email.includes('@') || !customer.address || !items.length) {
+    throw new Error('Bitte Name, E-Mail, Anschrift und Warenkorb angeben.');
+  }
+  const diagnostics = await telegramDiagnostics();
+  if (!diagnostics.authenticated || !diagnostics.bot?.username) {
+    const err = new Error('Telegram-Bot ist auf dem Server nicht authentifiziert.');
+    err.statusCode = 503;
+    throw err;
+  }
+  const verifiedBotUsername = String(diagnostics.bot.username).replace(/^@/,'').trim();
+  const requestedOrderNumber = String(data.order_number || '').trim();
+  const orderNumber = /^LYCA-\d{8}-[A-F0-9]{6}$/i.test(requestedOrderNumber)
+    ? requestedOrderNumber.toUpperCase()
+    : makeOrderNumber();
+  const invoiceNumber = makeInvoiceNumber(orderNumber);
+  const normalizedItems = items.map(x => ({
+    name:String(x.name || 'Lyca Mobile Triple-SIM'),
+    qty:Math.max(1,Number(x.qty)||1),
+    price:Math.max(0,Number(x.price)||0)
+  }));
+  const total = normalizedItems.reduce((sum,x) => sum + x.price*x.qty,0);
+  const order = {
+    orderNumber, invoiceNumber,
+    createdAt:new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'}),
+    customer:{
+      name:String(customer.name).trim(),
+      email:String(customer.email).trim(),
+      address:String(customer.address).trim()
+    },
+    telegramChatId:String(data.telegram_chat_id || '').trim(),
+    items:normalizedItems,
+    total,
+    paymentStatus:'UNBEZAHLT'
+  };
+  const result = await telegram.sendOrder(order);
+  const invoiceText = formatInvoice(order);
+  const supportUrl = result.supportUrl || ``${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
+  const verifiedBotUrl = `https://t.me/${verifiedBotUsername}?start=${encodeURIComponent(orderNumber)}`;
+  return {order, result, invoiceText, supportUrl, verifiedBotUrl};
+}
+
+async function telegramCheckoutRedirect(req,res) {
+  try {
+    const data = await parseUrlEncoded(req);
+    const created = await createTelegramOrder(data);
+    res.writeHead(303, {
+      Location: created.verifiedBotUrl,
+      'Cache-Control': 'no-store'
+    });
+    res.end();
+  } catch (err) {
+    console.error('Lyca checkout redirect error:',err);
+    sendJson(res, Number(err.statusCode)||400, {ok:false,error:err.message||'Bestellung konnte nicht verarbeitet werden.'});
+  }
+}
 function sendJson(res, status, payload) {
   const data = JSON.stringify(payload);
   res.writeHead(status, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
