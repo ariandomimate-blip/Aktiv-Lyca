@@ -195,14 +195,20 @@ async function sendWalletQRCodes(chatId, order = null) {
 }
 function orderKeyboard(order, admin = false) {
   if (order && admin) return adminOrderKeyboard(order);
-  const rows = [];
+  const rows = [
+    [urlButton('🛍️ Shop öffnen', publicBaseUrl)],
+    [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
+    [callback('🧾 Kasse', 'checkout')]
+  ];
   if (order) {
-    rows.push([callback('🧾 Rechnung', `invoice:${order.orderNumber}`)]);
+    // This is the already-created webshop order. These buttons only open/read/update
+    // that order; they NEVER create another order.
+    rows.push([callback('🧾 Rechnung', 'invoice:' + order.orderNumber)]);
     if (order.paymentStatus !== 'BEZAHLT') {
       rows.push([callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)]);
-      rows.push([callback('🔗 Transaktions-ID eingeben', 'txid_input:' + order.orderNumber)]);
+      rows.push([callback('🔗 TXID eingeben', 'txid_input:' + order.orderNumber)]);
     } else {
-      rows.push([callback('🧾 Bezahlung abgeschlossen mit Rechnung', 'paid_invoice:' + order.orderNumber)]);
+      rows.push([callback('✅ Rechnung / Zahlung bestätigt', 'paid_invoice:' + order.orderNumber)]);
     }
     rows.push([urlButton('💬 Support kontaktieren', supportUrl(order))]);
   }
