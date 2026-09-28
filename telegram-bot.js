@@ -92,6 +92,9 @@ function supportUrl(order) {
   return `https://t.me/${supportUsername}?text=${encodeURIComponent(text)}`;
 }
 function webAppButton() { return { text: '🛍️ Shop öffnen', web_app: { url: publicBaseUrl } }; }
+function telegramCheckoutButton(chatId) {
+  return { text: '🧾 Kasse öffnen', web_app: { url: publicBaseUrl + '/telegram-checkout?chat_id=' + encodeURIComponent(String(chatId)) } };
+}
 function urlButton(text, url) { return { text, url }; }
 function callback(text, data) { return { text, callback_data: data }; }
 function qrUrl(value) {
@@ -518,20 +521,13 @@ async function handleCallback(q) {
   if (data === 'checkout') {
     const cart = cartItems(chatId);
     if (!cart.length) return sendMessage(chatId, '🛒 Dein Warenkorb ist leer. Wähle zuerst ein Produkt.', { reply_markup: productKeyboard() });
-    const session = getSession(chatId);
-    session.checkout = { step: 'name', name: '', email: '', address: '' };
-    return sendMessage(chatId,
-      '🧾 CHECKOUT DIREKT IN TELEGRAM\\n\\n' +
-      cartText(chatId) +
-      '\\n\\n👤 Bitte gib jetzt deinen vollständigen Namen ein.\\n\\nDu musst den Webshop nicht mehr öffnen.',
-      { reply_markup: { inline_keyboard: [[callback('❌ Kasse abbrechen', 'checkout:cancel')]] } }
+    return sendMessage(
+      chatId,
+      '🧾 CHECKOUT\\n\\n' + cartText(chatId) + '\\n\\n👤 Öffne die Kasse und gib Name, E-Mail und Anschrift in einem Formular ein.\\n\\n✅ Die Bestellung wird danach direkt in diesem Telegram-Chat weitergeführt.',
+      { reply_markup: { inline_keyboard: [[telegramCheckoutButton(chatId)], [callback('❌ Kasse abbrechen', 'cart')]] } }
     );
   }
-  if (data === 'checkout:cancel') {
-    const session = getSession(chatId);
-    session.checkout = null;
-    return showCart(chatId, messageId);
-  }
+  if (data === 'checkout:cancel') return showCart(chatId, messageId);
   if (data.startsWith('txid_input:')) {
     const order = getOrder(data.slice(11));
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
