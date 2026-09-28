@@ -62,8 +62,12 @@ $('#checkoutForm').onsubmit=async e=>{
   let orderRequest;
   try{
     orderRequest=fetch('/api/telegram-order',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({order_number:clientOrderNumber,customer,items,payment_status:'UNBEZAHLT',telegram_chat_id:telegramChatId})});
-    try{ telegramOpened=Boolean(window.open(immediateTelegramUri,'_blank')); }catch{}
-    if(!telegramOpened){ try{ window.location.href=immediateTelegramUri; telegramOpened=true; }catch{} }
+    try{
+      // Navigate directly from the original checkout gesture. Do not use window.open:
+      // iOS can report a popup as opened while silently blocking the Telegram handoff.
+      window.location.href=telegramBotUrl(clientOrderNumber);
+      telegramOpened=true;
+    }catch{}
     const r=await orderRequest;
     const data=await r.json();if(!r.ok)throw new Error(data.error||'Bestellung konnte nicht vorbereitet werden.');
     const orderNumber=String(data.order_number||'');
