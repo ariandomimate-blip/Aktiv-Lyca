@@ -148,7 +148,7 @@ function quantityKeyboard() {
 }
 function cartKeyboard(hasItems) {
   const rows = [];
-  if (hasItems) rows.push([callback('🧾 Bestellung im Shop abschließen', 'checkout')], [callback('🛍️ Weiter einkaufen', 'products')], [callback('🗑️ Warenkorb leeren', 'cart:clear')]);
+  if (hasItems) rows.push([callback('🧾 Kasse', 'checkout')], [callback('🛍️ Weiter einkaufen', 'products')], [callback('🗑️ Warenkorb leeren', 'cart:clear')]);
   else rows.push([callback('🛍️ Produkte anzeigen', 'products')]);
   rows.push([webAppButton(), callback('↩️ Start', 'home')]);
   return { inline_keyboard: rows };
@@ -209,12 +209,11 @@ function orderKeyboard(order, admin = false) {
   if (order) {
     // This is the already-created webshop order. These buttons only open/read/update
     // that order; they NEVER create another order.
-    rows.push([callback('🧾 Rechnung', 'invoice:' + order.orderNumber)]);
     if (order.paymentStatus !== 'BEZAHLT') {
       rows.push([callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)]);
       rows.push([callback('🔗 TXID eingeben', 'txid_input:' + order.orderNumber)]);
     } else {
-      rows.push([callback('✅ Rechnung / Zahlung bestätigt', 'paid_invoice:' + order.orderNumber)]);
+      rows.push([callback('🧾 Rechnung / Zahlung bestätigt', 'paid_invoice:' + order.orderNumber)]);
     }
     rows.push([urlButton('💬 Support kontaktieren', supportUrl(order))]);
   }
