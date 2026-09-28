@@ -156,7 +156,10 @@ async function telegramOrder(req,res) {
       });
     }
     const verifiedBotUsername = String(diagnostics.bot.username).replace(/^@/,'').trim();
-    const orderNumber = makeOrderNumber();
+    const requestedOrderNumber = String(data.order_number || '').trim();
+    const orderNumber = /^LYCA-\d{8}-[A-F0-9]{6}$/i.test(requestedOrderNumber)
+      ? requestedOrderNumber.toUpperCase()
+      : makeOrderNumber();
     const invoiceNumber = makeInvoiceNumber(orderNumber);
     const normalizedItems = items.map(x => ({
       name:String(x.name || 'Lyca Mobile Triple-SIM'),
