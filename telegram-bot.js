@@ -65,6 +65,12 @@ const products = {
 };
 
 function formatMoney(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
+function makeTelegramOrderNumber() {
+  const d = new Date();
+  const stamp = d.toISOString().slice(0,10).replace(/-/g,'');
+  const rnd = Math.random().toString(16).slice(2,8).toUpperCase();
+  return 'LYCA-' + stamp + '-' + rnd;
+}
 
 function formatOrder(order) {
   const lines = order.items.map(x => `• ${x.name} · ${x.qty} Stück · ${formatMoney(x.price)} / Stück`).join('\n');
@@ -510,7 +516,23 @@ async function handleCallback(q) {
     if (!wallets[coin]) return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     return sendMessage(chatId, walletText(coin), { reply_markup: walletKeyboard() });
   }
-  if (data === 'checkout') return sendMessage(chatId, '🧾 Die Bestellung wird direkt im Webshop mit deinen Kontaktdaten abgeschlossen. Nach dem Abschluss erhältst du hier sofort die Rechnung mit Status UNBEZAHLT.', { reply_markup: { inline_keyboard: [[webAppButton()]] } });
+  if (data === 'checkout') {
+    const cart = cartItems(chatId);
+    if (!cart.length) return sendMessage(chatId, '🛒 Dein Warenkorb ist leer. Wähle zuerst ein Produkt.', { reply_markup: productKeyboard() });
+    const session = getSession(chatId);
+    session.checkout = { step: 'name', name: '', email: '', address: '' };
+    return sendMessage(chatId,
+      '🧾 CHECKOUT DIREKT IN TELEGRAM\\n\\n' +
+      cartText(chatId) +
+      '\\n\\n👤 Bitte gib jetzt deinen vollständigen Namen ein.\\n\\nDu musst den Webshop nicht mehr öffnen.',
+      { reply_markup: { inline_keyboard: [[callback('❌ Kasse abbrechen', 'checkout:cancel')]] } }
+    );
+  }
+  if (data === 'checkout:cancel') {
+    const session = getSession(chatId);
+    session.checkout = null;
+    return showCart(chatId, messageId);
+  }
   if (data.startsWith('txid_input:')) {
     const order = getOrder(data.slice(11));
     if (!order) return sendMessage(chatId, 'Bestellung nicht gefunden.');
@@ -589,6 +611,72 @@ async function handleUpdate(update) {
     resolvedSupportChatId = String(chatId);
   }
   const session = getSession(chatId);
+
+  // Direct Telegram checkout: collect the same customer data as the webshop,
+  // create the order in this bot process, and immediately issue the invoice/wallets.
+  if (session.checkout && text && !text.startsWith('/')) {
+    const step = session.checkout.step;
+    if (step === 'name') {
+      if (text.length < 2) return sendMessage(chatId, '⚠️ Bitte gib deinen vollständigen Namen ein.');
+      session.checkout.name = text;
+      session.checkout.step = 'email';
+      return sendMessage(chatId, '📧 Danke. Bitte gib jetzt deine E-Mail-Adresse ein.');
+    }
+    if (step === 'email') {
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(text)) return sendMessage(chatId, '⚠️ Bitte gib eine gültige E-Mail-Adresse ein.');
+      session.checkout.email = text;
+      session.checkout.step = 'address';
+      return sendMessage(chatId, '📍 Danke. Bitte gib jetzt deine vollständige Anschrift ein (Straße, Hausnummer, PLZ, Ort).');
+    }
+    if (step === 'address') {
+      if (text.length < 5) return sendMessage(chatId, '⚠️ Bitte gib deine vollständige Anschrift ein.');
+      session.checkout.address = text;
+      const cart = cartItems(chatId);
+      if (!cart.length) {
+        session.checkout = null;
+        return sendMessage(chatId, '🛒 Dein Warenkorb ist leer. Bitte wähle zuerst ein Produkt.', { reply_markup: productKeyboard() });
+      }
+      const orderNumber = makeTelegramOrderNumber();
+      const invoiceNumber = orderNumber.replace(/^LYCA-/, 'LYCA-RE-');
+      const items = cart.map(x => ({
+        name: x.name,
+        qty: Math.max(1, Number(x.qty) || 1),
+        price: Math.max(0, Number(x.unitPrice) || 0)
+      }));
+      const total = items.reduce((sum, x) => sum + x.price * x.qty, 0);
+      const order = {
+        orderNumber,
+        invoiceNumber,
+        createdAt: new Date().toLocaleString('de-DE', {timeZone:'Europe/Berlin'}),
+        customer: {
+          name: session.checkout.name,
+          email: session.checkout.email,
+          address: session.checkout.address
+        },
+        telegramChatId: String(chatId),
+        items,
+        total,
+        paymentStatus: 'UNBEZAHLT'
+      };
+      session.checkout = null;
+      clearCart(chatId);
+      session.lastOrder = orderNumber;
+      try {
+        const result = await sendOrder(order);
+        return sendMessage(chatId,
+          '✅ BESTELLUNG ERSTELLT\\n\\n' +
+          invoiceText(order) +
+          '\\n\\n📌 Zahlungsstatus: UNBEZAHLT\\n' +
+          'Die Rechnung und die Wallet-/QR-Codes wurden direkt hier in Telegram bereitgestellt.\\n\\n' +
+          '🔗 Du musst den Webshop nicht öffnen.',
+          { reply_markup: orderKeyboard(order) }
+        );
+      } catch (err) {
+        saveOrder(order);
+        return sendMessage(chatId, '⚠️ Bestellung erstellt, aber die Benachrichtigung konnte nicht vollständig gesendet werden. Bestellnummer: ' + orderNumber, { reply_markup: orderKeyboard(order) });
+      }
+    }
+  }
 
   // Customer must provide the transaction ID before the administrator can review the payment.
   if (session.pendingPaymentOrder && text && !text.startsWith('/')) {
