@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08110f">
+<title>Lyca · Kasse</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07100f;color:#f7f8fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:560px;margin:auto;padding:24px 18px 36px}.card{background:#101a18;border:1px solid #ffffff16;border-radius:22px;padding:22px;box-shadow:0 18px 60px #0007}
+h1{margin:0 0 6px;font-size:30px}.muted{color:#aebbb7}.cart{margin:18px 0;padding:15px;border-radius:16px;background:#08120f;border:1px solid #ffffff12}
+.item{display:flex;justify-content:space-between;gap:15px;padding:8px 0;border-bottom:1px solid #ffffff0d}.item:last-child{border-bottom:0}.total{display:flex;justify-content:space-between;margin-top:12px;font-size:19px;font-weight:800}
+label{display:block;margin:14px 0 6px;font-weight:700}input{width:100%;padding:14px 13px;border-radius:13px;border:1px solid #ffffff18;background:#08100f;color:#fff;font-size:16px;outline:none}
+button{width:100%;margin-top:18px;padding:15px;border:0;border-radius:14px;background:#d4ffef;color:#07110e;font-weight:800;font-size:17px}button:disabled{opacity:.55}
+.notice{margin-top:14px;color:#aebbb7;font-size:13px;line-height:1.45}.error{color:#ff9b9b;margin-top:12px;white-space:pre-wrap}.ok{color:#a7ffd9;text-align:center;padding:20px 0;font-size:18px}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>🧾 Kasse</h1>
+<div class="muted">Lyca Webshop · Bestellung direkt in Telegram</div>
+<div id="cart" class="cart">Warenkorb wird geladen …</div>
+<form id="form">
+<label for="name">Vor- und Nachname</label>
+<input id="name" required autocomplete="name" placeholder="Max Mustermann">
+<label for="email">E-Mail</label>
+<input id="email" required type="email" autocomplete="email" placeholder="max@example.de">
+<label for="address">Vollständige Anschrift</label>
+<input id="address" required autocomplete="street-address" placeholder="Straße, Hausnummer, PLZ, Ort">
+<button id="submit" type="submit">✅ Bestellung abschließen</button>
+</form>
+<div class="notice">Nach dem Absenden erhältst du im Telegram-Chat die Bestellung, Zahlungs-Wallets und QR-Codes. Danach kannst du die TXID eingeben. Die Rechnung wird erst nach Bestätigung durch Lyca_Support auf BEZAHLT gesetzt.</div>
+<div id="error" class="error"></div><div id="success" class="ok" hidden>✅ Bestellung erstellt. Telegram wird aktualisiert.</div>
+</div></div>
+<script>
+const tg=window.Telegram?.WebApp;
+tg?.ready();tg?.expand();
+const params=new URLSearchParams(location.search);
+const chatId=String(params.get('chat_id')||tg?.initDataUnsafe?.user?.id||'');
+let cartData=null;
+const cartEl=document.getElementById('cart'),form=document.getElementById('form'),btn=document.getElementById('submit'),errorEl=document.getElementById('error'),successEl=document.getElementById('success');
+function money(n){return Number(n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'});}
+async function loadCart(){
+ if(!chatId){cartEl.textContent='Telegram-Konto konnte nicht erkannt werden.';btn.disabled=true;return;}
+ const r=await fetch('/api/telegram-cart?chat_id='+encodeURIComponent(chatId),{cache:'no-store'});
+ const d=await r.json();
+ if(!d.ok||!d.cart?.items?.length){cartEl.textContent='🛒 Dein Warenkorb ist leer.';btn.disabled=true;return;}
+ cartData=d.cart;
+ cartEl.innerHTML='<strong>🛒 Dein Warenkorb</strong>'+d.cart.items.map(x=>'<div class="item"><span>'+String(x.name).replace(/</g,'&lt;')+' · '+x.qty+' Stück</span><strong>'+money(x.price*x.qty)+'</strong></div>').join('')+'<div class="total"><span>Gesamt</span><span>'+money(d.cart.total)+'</span></div>';
+}
+form.addEventListener('submit',async e=>{
+ e.preventDefault();errorEl.textContent='';if(!cartData?.items?.length)return;
+ btn.disabled=true;btn.textContent='BESTELLUNG WIRD ERSTELLT …';
+ const orderNumber='LYCA-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Array.from(crypto.getRandomValues(new Uint8Array(3))).map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+ const payload={order_number:orderNumber,telegram_chat_id:chatId,customer:{name:document.getElementById('name').value.trim(),email:document.getElementById('email').value.trim(),address:document.getElementById('address').value.trim()},items:cartData.items.map(x=>({name:x.name,qty:x.qty,price:x.price}))};
+ try{
+  const r=await fetch('/api/telegram-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Bestellung konnte nicht erstellt werden.');
+  successEl.hidden=false;form.hidden=true;cartEl.innerHTML='<strong>✅ Bestellung erstellt</strong><div class="total"><span>Bestellnummer</span><span>'+d.order_number+'</span></div>';
+  try{tg?.close();}catch{}
+ }catch(err){errorEl.textContent='⚠️ '+err.message;btn.disabled=false;btn.textContent='✅ Bestellung abschließen';}
+});
+loadCart().catch(()=>{errorEl.textContent='⚠️ Warenkorb konnte nicht geladen werden.';btn.disabled=true;});
+</script>
+</body>
+</html>
