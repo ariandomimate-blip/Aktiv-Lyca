@@ -390,6 +390,7 @@ const server = http.createServer(async (req,res) => {
   }
   if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
+  if (req.method === 'POST' && route === '/telegram-checkout-redirect') return telegramCheckoutRedirect(req,res);
 
   // Count homepage visits for the Lyca Support admin panel.
   if (req.method === 'GET' && (route === '/' || route === '/index.html')) { recordPageView(); return sendFile(path.join(root,'index.html'),res); }
