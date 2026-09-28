@@ -122,7 +122,7 @@ async function createTelegramOrder(data) {
   };
   const result = await telegram.sendOrder(order);
   const invoiceText = formatInvoice(order);
-  const supportUrl = result.supportUrl || ``${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
+  const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
   const verifiedBotUrl = `https://t.me/${verifiedBotUsername}?start=${encodeURIComponent(orderNumber)}`;
   return {order, result, invoiceText, supportUrl, verifiedBotUrl};
 }
