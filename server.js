@@ -378,6 +378,16 @@ const server = http.createServer(async (req,res) => {
     }
   }
   // Lightweight public health endpoint for Render and browser diagnostics.\n  if (req.method === 'GET' && route === '/health') {\n    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});\n  }\n  if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
+  if (req.method === 'GET' && route === '/api/telegram-cart') {
+    const params = new URL(req.url || '/', 'http://localhost').searchParams;
+    const chatId = String(params.get('chat_id') || '').trim();
+    if (!chatId) return sendJson(res,400,{ok:false,error:'chat_id fehlt'});
+    const cart = typeof telegram.getCartCheckout === 'function' ? telegram.getCartCheckout(chatId) : {items:[],total:0};
+    return sendJson(res,200,{ok:true,cart});
+  }
+  if (req.method === 'GET' && route === '/telegram-checkout') {
+    return sendFile(path.join(root,'telegram-checkout.html'),res);
+  }
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
   if (req.method === 'GET' && route === '/api/telegram-business-status') {
     const diagnostics = await telegramDiagnostics();
