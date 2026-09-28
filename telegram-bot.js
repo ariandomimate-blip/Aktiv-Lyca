@@ -276,7 +276,7 @@ async function sendOrder(order) {
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
     const result = await sendMessage(customerChatId,
-      `🧾 BESTELLUNG / RECHNUNG ERSTELLT\n\n${invoiceText(order)}\n\n📌 Zahlungsstatus: UNBEZAHLT\n\nBitte zuerst die Zahlung über einen der Wallets durchführen. Danach die Transaktions-ID über den Button eingeben. Erst Lyca_Support bestätigt die Zahlung.`,
+      `🧾 BESTELLUNG ERSTELLT\n\nBestellnummer: ${order.orderNumber}\nRechnungsnummer: ${order.invoiceNumber}\nGesamt: ${formatMoney(order.total)}\n\n📌 Zahlungsstatus: UNBEZAHLT\n\nBitte zuerst über die Wallets bezahlen und danach die TXID eingeben. Die Rechnung wird erst nach der Bestätigung durch Lyca_Support freigeschaltet.`,
       { reply_markup: orderKeyboard(order) }
     );
     customerNotified = Boolean(result.ok);
@@ -749,7 +749,7 @@ async function handleUpdate(update) {
     if (latestOrder) {
       return sendMessage(
         chatId,
-        `🧾 LYCA WEBSHOP · BESTELLUNG / RECHNUNG\n\n${invoiceText(latestOrder)}\n\n📌 Zahlungsstatus: ${latestOrder.paymentStatus === 'BEZAHLT' ? 'BEZAHLT' : 'UNBEZAHLT'}`,
+        `🧾 LYCA WEBSHOP · BESTELLUNG ERKANNT\n\nBestellnummer: ${latestOrder.orderNumber}\nRechnungsnummer: ${latestOrder.invoiceNumber}\nGesamt: ${formatMoney(latestOrder.total)}\n\n📌 Zahlungsstatus: ${latestOrder.paymentStatus === 'BEZAHLT' ? 'BEZAHLT' : 'UNBEZAHLT'}\n\n${latestOrder.paymentStatus === 'BEZAHLT' ? 'Die Zahlung ist bestätigt. Deine Rechnung ist verfügbar.' : 'Die Bestellung ist bereits erstellt. Bezahle jetzt, gib die TXID ein und warte auf die Bestätigung durch Lyca_Support. Du musst die Produkte nicht erneut auswählen.'}`,
         { reply_markup: orderKeyboard(latestOrder) }
       );
     }
