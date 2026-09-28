@@ -665,9 +665,11 @@ async function handleUpdate(update) {
         const result = await sendOrder(order);
         return sendMessage(chatId,
           '✅ BESTELLUNG ERSTELLT\\n\\n' +
-          invoiceText(order) +
-          '\\n\\n📌 Zahlungsstatus: UNBEZAHLT\\n' +
-          'Die Rechnung und die Wallet-/QR-Codes wurden direkt hier in Telegram bereitgestellt.\\n\\n' +
+          'Bestellnummer: ' + order.orderNumber + '\\n' +
+          'Rechnungsnummer: ' + order.invoiceNumber + '\\n' +
+          'Gesamt: ' + formatMoney(order.total) + '\\n' +
+          '📌 Zahlungsstatus: UNBEZAHLT\\n\\n' +
+          'Die Rechnung und die Wallet-/QR-Codes wurden direkt in diesem Telegram-Chat gesendet.\\n' +
           '🔗 Du musst den Webshop nicht öffnen.',
           { reply_markup: orderKeyboard(order) }
         );
