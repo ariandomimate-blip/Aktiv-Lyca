@@ -377,7 +377,7 @@ const server = http.createServer(async (req,res) => {
       return res.end();
     }
   }
-  if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
+  // Lightweight public health endpoint for Render and browser diagnostics.\n  if (req.method === 'GET' && route === '/health') {\n    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});\n  }\n  if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
   if (req.method === 'GET' && route === '/api/telegram-business-status') {
     const diagnostics = await telegramDiagnostics();
