@@ -704,14 +704,26 @@ async function handleUpdate(update) {
         await sendMessage(adminId, notice, { reply_markup: adminOrderKeyboard(order) });
       }
       if (!recipients.length) {
-        return sendMessage(chatId, '⚠️ TXID gespeichert, aber Lyca_Support ist noch nicht als Administrator erreichbar.');
+        return sendMessage(
+          chatId,
+          '⚠️ TXID gespeichert, aber Lyca_Support ist noch nicht als Administrator erreichbar.\\n\\n' +
+          '👉 @' + supportUsername + ' muss den Bot einmal öffnen und „Start“ bzw. /start admin drücken. Danach wird dieses Telegram-Konto automatisch als Administrator registriert und alle offenen TXIDs werden an Lyca_Support weitergeleitet.',
+          { reply_markup: { inline_keyboard: [[urlButton('🛠️ Lyca_Support · Admin aktivieren', 'https://t.me/' + botUsername + '?start=admin')]] } }
+        );
       }
       return sendMessage(chatId, `⏳ TX-ID ÜBERMITTELT\\n\\nBestellung: ${order.orderNumber}\\nRechnungsnummer: ${order.invoiceNumber}\\nTXID: ${order.transactionId}\\nZahlungsstatus: UNBEZAHLT\\n\\nDie Transaktions-ID wurde direkt an @${supportUsername} zur Prüfung gesendet. Lyca_Support muss die Zahlung zuerst bestätigen. Danach erhältst du automatisch die aktualisierte Rechnung mit TXID und Status BEZAHLT.`);
     }
     session.pendingPaymentOrder = null;
   }
 
-  if (command === '/admin') return showAdminPanel(chatId);
+  if (command === '/admin') {
+    if (isSupportAdmin) {
+      adminChatIds.add(String(chatId));
+      resolvedSupportChatId = String(chatId);
+      return sendMessage(chatId, '🛠️ LYCA_SUPPORT · ADMINISTRATOR AKTIVIERT\\n\\n✅ Dieses Telegram-Konto ist registriert. Neue TXIDs und Bestellungen werden direkt hierher weitergeleitet.', { reply_markup: { inline_keyboard: [[callback('🛠️ Admin-Panel', 'admin:panel')]] } });
+    }
+    return sendMessage(chatId, '⛔ Administratorzugriff ist nur für @' + supportUsername + ' freigeschaltet.');
+  }
   if (command === '/start') {
     const startParam = String(parts[1] || '').trim();
     if (startParam && startParam.toLowerCase() === 'admin') {
