@@ -614,6 +614,11 @@ async function handleUpdate(update) {
   if (command === '/admin') return showAdminPanel(chatId);
   if (command === '/start') {
     const startParam = String(parts[1] || '').trim();
+    if (startParam && startParam !== 'wallets') {
+      for (let i=0; i<8 && !getOrder(startParam); i++) {
+        await new Promise(resolve=>setTimeout(resolve,250));
+      }
+    }
     if (startParam.toLowerCase() === 'wallets') {
       return sendMessage(chatId, walletsText(), { reply_markup: walletKeyboard() });
     }
