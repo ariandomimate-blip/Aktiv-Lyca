@@ -175,7 +175,7 @@ function walletsText(order) {
 }
 async function sendWalletQRCodes(chatId, order = null) {
   const title = order
-    ? `💳 ZAHLUNG FÜR BESTELLUNG ${order.orderNumber}\n\nGesamt: ${formatMoney(order.total)}\nStatus: ${order.paymentStatus}\n\nScanne den gewünschten QR-Code. Nach der Überweisung drücke unten einmal „Zahlung getätigt“.`
+    ? `💳 ZAHLUNG FÜR BESTELLUNG ${order.orderNumber}\n\nGesamt: ${formatMoney(order.total)}\nStatus: ${order.paymentStatus}\n\nScanne den gewünschten QR-Code. Nach der Überweisung gib unten die TXID ein.`
     : '💳 LYCA WEBSHOP · ZAHLUNGS-WALLETS\n\nScanne den gewünschten QR-Code.';
   await sendMessage(chatId, title);
   const entries = [
@@ -197,21 +197,23 @@ async function sendWalletQRCodes(chatId, order = null) {
   }
   if (order) {
     await sendMessage(chatId,
-      `🔘 ZAHLUNGSSTATUS\n\nBestellung: ${order.orderNumber}\nStatus: ${order.paymentStatus}\n\nNach deiner Zahlung einmal den Button drücken. Die Zahlung wird anschließend vom Administrator geprüft und bestätigt.`,
+      `🔘 ZAHLUNGSSTATUS\n\nBestellung: ${order.orderNumber}\nStatus: ${order.paymentStatus}\n\nNach deiner Zahlung gib die TXID ein. Die Zahlung wird anschließend vom Administrator geprüft und bestätigt.`,
       { reply_markup: paymentKeyboard(order) }
     );
   }
 }
 function orderKeyboard(order, admin = false) {
   if (order && admin) return adminOrderKeyboard(order);
-  const rows = [
-    [urlButton('🛍️ Shop öffnen', publicBaseUrl)],
-    [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
-    [callback('🧾 Kasse', 'checkout')]
-  ];
+  const rows = [];
+  if (!order) {
+    rows.push(
+      [urlButton('🛍️ Shop öffnen', publicBaseUrl)],
+      [callback('🛍️ Produkte', 'products'), callback('🛒 Warenkorb', 'cart')],
+      [callback('🧾 Kasse', 'checkout')]
+    );
+  }
   if (order) {
-    // This is the already-created webshop order. These buttons only open/read/update
-    // that order; they NEVER create another order.
+    // Existing order: never make the customer rebuild the cart or start checkout again.
     if (order.paymentStatus !== 'BEZAHLT') {
       rows.push([callback('💳 Wallets / QR-Codes', 'wallets:' + order.orderNumber)]);
       rows.push([callback('🔗 TXID eingeben', 'txid_input:' + order.orderNumber)]);
@@ -530,7 +532,7 @@ async function handleCallback(q) {
     if (!cart.length) return sendMessage(chatId, '🛒 Dein Warenkorb ist leer. Wähle zuerst ein Produkt.', { reply_markup: productKeyboard() });
     return sendMessage(
       chatId,
-      '🧾 CHECKOUT\\n\\n' + cartText(chatId) + '\\n\\n👤 Öffne die Kasse und gib Name, E-Mail und Anschrift in einem Formular ein.\\n\\n✅ Die Bestellung wird danach direkt in diesem Telegram-Chat weitergeführt.',
+      '🧾 CHECKOUT\n\n' + cartText(chatId) + '\n\n👤 Öffne die Kasse und gib Name, E-Mail und Anschrift in einem Formular ein.\n\n✅ Die Bestellung wird danach direkt in diesem Telegram-Chat weitergeführt.',
       { reply_markup: { inline_keyboard: [[telegramCheckoutButton(chatId)], [callback('❌ Kasse abbrechen', 'cart')]] } }
     );
   }
