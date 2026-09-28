@@ -614,6 +614,25 @@ async function handleUpdate(update) {
   if (command === '/admin') return showAdminPanel(chatId);
   if (command === '/start') {
     const startParam = String(parts[1] || '').trim();
+    if (startParam && startParam.toLowerCase() === 'admin') {
+      // One-time administrator registration: Telegram only exposes a user's private
+      // chat ID after that user has opened/started the bot. When @Lyca_Support
+      // starts the bot, register that chat immediately and make the admin panel available.
+      if (isSupportAdmin) {
+        adminChatIds.add(String(chatId));
+        resolvedSupportChatId = String(chatId);
+        session.lastOrder = session.lastOrder || null;
+        return sendMessage(chatId,
+          '🛠️ LYCA_SUPPORT · ADMINISTRATOR AKTIVIERT\\n\\n' +
+          '✅ Dieses Telegram-Konto ist jetzt als Administrator registriert.\\n' +
+          '👤 @' + supportUsername + '\\n' +
+          '🆔 Chat-ID: ' + chatId + '\\n\\n' +
+          'Neue Bestellungen und TX-ID-Prüfungen werden ab jetzt hierher weitergeleitet.',
+          { reply_markup: adminPanelKeyboard() }
+        );
+      }
+      return sendMessage(chatId, '⛔ Der Administrator-Link kann nur mit @' + supportUsername + ' aktiviert werden.');
+    }
     if (startParam && startParam !== 'wallets') {
       for (let i=0; i<8 && !getOrder(startParam); i++) {
         await new Promise(resolve=>setTimeout(resolve,250));
