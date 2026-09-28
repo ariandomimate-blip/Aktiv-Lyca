@@ -260,6 +260,13 @@ function cartText(chatId) {
   const lines = cart.map(x => `• ${x.name}\n  Menge: ${x.qty}\n  Preis: ${formatMoney(x.unitPrice)} / Stück\n  Position: ${formatMoney(x.unitPrice * x.qty)}`).join('\n\n');
   return `🛒 DEIN WARENKORB\n\n${lines}\n\n💶 Gesamt: ${formatMoney(cartTotal(chatId))}`;
 }
+function getCartCheckout(chatId) {
+  const cart = cartItems(chatId);
+  return {
+    items: cart.map(x => ({ productId:x.productId, name:x.name, qty:Number(x.qty)||1, price:Number(x.unitPrice)||0 })),
+    total: cartTotal(chatId)
+  };
+}
 function productText() {
   return `📱 LYCA MOBILE TRIPLE-SIM\n\n${products.lyca.description}\n\n✓ Standard-, Micro- und Nano-SIM\n✓ Telefonie & SMS\n✓ Mobiles Internet je nach Tarif\n✓ Deutsche Nummer\n\n📦 MENGENPREISE\n10 → 7,00 € / Stück\n50 → 5,00 € / Stück\n100 → 4,50 € / Stück\n200 → 4,00 € / Stück\n250 → 3,80 € / Stück\n500 → 3,50 € / Stück\n\nWähle unten die gewünschte Menge.`;
 }
@@ -830,6 +837,7 @@ module.exports = {
   supportUsername,
   supportChatId,
   botOrderUrl,
+  getCartCheckout,
   getBusinessStatus: () => ({
     connections: Array.from(businessConnections.values()).map(c => ({
       id: c.id,
