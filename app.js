@@ -56,6 +56,10 @@ $('#checkoutForm').onsubmit=async e=>{
   const telegramChatId=window.Telegram?.WebApp?.initDataUnsafe?.user?.id?String(window.Telegram.WebApp.initDataUnsafe.user.id):'';
   const items=state.items.map(x=>({name:`${x.brand} ${x.name}`,qty:x.qty,price:unitPrice(x.qty)}));
   const btn=e.target.querySelector('button[type="submit"]');btn.disabled=true;btn.textContent='BESTELLUNG WIRD VORBEREITET …';
+  // Open a blank tab synchronously from the customer's tap. iOS Safari otherwise
+  // blocks the later Telegram handoff because the fetch below is asynchronous.
+  let telegramWindow=null;
+  try{ telegramWindow=window.open('about:blank','_blank'); }catch{}
   try{
     const r=await fetch('/api/telegram-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,payment_status:'UNBEZAHLT',telegram_chat_id:telegramChatId})});
     const data=await r.json();if(!r.ok)throw new Error(data.error||'Bestellung konnte nicht vorbereitet werden.');
@@ -75,8 +79,14 @@ $('#checkoutForm').onsubmit=async e=>{
     const openOrderBtn=document.getElementById('openTelegramOrder');
     if(openOrderBtn)openOrderBtn.onclick=()=>openTelegramSupport(botUrl,orderNumber);
     e.target.reset();
-    // iOS blocks automatic app handoff after an asynchronous checkout request.
-    // The customer now taps the Telegram button, which preserves the user gesture.
+    // Complete the Telegram handoff in the tab that was opened synchronously
+    // from the original checkout tap. This preserves iOS's user-gesture context.
+    if(telegramWindow && !telegramWindow.closed){
+      try{ telegramWindow.location.href=botUrl; }
+      catch{ openTelegramSupport(botUrl,orderNumber); }
+    }else{
+      openTelegramSupport(botUrl,orderNumber);
+    }
   }catch(err){
     console.error('Lyca checkout error:',err);
     const msg=String(err?.message||err||'Unbekannter Fehler');
