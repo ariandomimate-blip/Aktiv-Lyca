@@ -26,6 +26,8 @@ const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
 // Production webshop domain. Render custom-domain DNS must point aktiv-lyca.de to this service.
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/,'');
+const REDIRECT_TO_CANONICAL = String(process.env.REDIRECT_TO_CANONICAL || 'false').toLowerCase() === 'true';
+const CANONICAL_SHOP_URL = String(process.env.CANONICAL_SHOP_URL || PUBLIC_BASE_URL).replace(/\/$/,'');
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
 const SUPPORT_URL = `https://t.me/${SUPPORT_USERNAME}`;
@@ -352,6 +354,18 @@ async function setupTelegram() {
 
 const server = http.createServer(async (req,res) => {
   const route = (req.url || '').split('?')[0];
+  if (REDIRECT_TO_CANONICAL) {
+    if (req.method === 'GET' && !route.startsWith('/api/')) {
+      const target = CANONICAL_SHOP_URL + (req.url || '/');
+      res.writeHead(308, {'Location': target, 'Cache-Control':'no-store'});
+      return res.end();
+    }
+    if (req.method === 'POST' && (route === '/telegram-checkout-redirect' || route === '/api/telegram-order')) {
+      const target = CANONICAL_SHOP_URL + route + ((req.url || '').includes('?') ? '?' + (req.url || '').split('?').slice(1).join('?') : '');
+      res.writeHead(307, {'Location': target, 'Cache-Control':'no-store'});
+      return res.end();
+    }
+  }
   if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
   if (req.method === 'GET' && route === '/api/telegram-invite') return telegramInvite(req,res);
   if (req.method === 'GET' && route === '/api/telegram-business-status') {
