@@ -133,11 +133,22 @@ async function telegramCheckoutRedirect(req,res) {
   try {
     const data = await parseUrlEncoded(req);
     const created = await createTelegramOrder(data);
-    res.writeHead(303, {
-      Location: created.verifiedBotUrl,
+    const target = created.verifiedBotUrl;
+    const safeTarget = String(target).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const html = '<!doctype html><html lang="de"><head>' +
+      '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<meta name="robots" content="noindex,nofollow">' +
+      '<title>Weiter zu Telegram</title>' +
+      '<style>body{margin:0;background:#0b0f14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}.card{width:min(520px,100%);background:#151b22;border:1px solid #2b3440;border-radius:24px;padding:28px;box-sizing:border-box;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.35)}h1{font-size:25px;margin:0 0 10px}p{color:#b8c1cc;line-height:1.5}.btn{display:block;width:100%;box-sizing:border-box;margin-top:18px;padding:16px;border-radius:14px;background:#229ed9;color:#fff;text-decoration:none;font-weight:700;font-size:17px}.small{font-size:13px;color:#7f8a96;margin-top:14px}</style>' +
+      '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.location.href=' + JSON.stringify(target) + '}catch(e){}},150)});</script>' +
+      '</head><body><main class="card"><h1>Bestellung erstellt ✅</h1><p>Deine Bestellung wurde gespeichert. Telegram wird jetzt geöffnet.</p>' +
+      '<a class="btn" href="' + safeTarget + '">🤖 Telegram öffnen</a>' +
+      '<div class="small">Falls Telegram nicht automatisch startet, tippe auf den Button.</div></main></body></html>';
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
     });
-    res.end();
+    res.end(html);
   } catch (err) {
     console.error('Lyca checkout redirect error:',err);
     sendJson(res, Number(err.statusCode)||400, {ok:false,error:err.message||'Bestellung konnte nicht verarbeitet werden.'});
