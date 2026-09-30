@@ -181,7 +181,7 @@ async function telegramApi(method, body = {}) {
   }
 }
 
-const BOT_DESCRIPTION = 'Willkommen im Lyca Webshop! 🛍️ Lyca Mobile Triple-SIM bequem online bestellen. Warenkorb, Bestellung und Rechnung direkt über Telegram. Support: @' + SUPPORT_USERNAME;
+const BOT_DESCRIPTION = 'Mit bereits aktivierten Lyca Mobile Prepaid-SIM-Karten bist du sofort startklar. 📱 Triple-SIM (Standard, Micro, Nano), deutsche Rufnummer, flexible Tarifwahl und Guthabenaufladung. Bestellung, Warenkorb und Rechnung direkt über Telegram. Bitte beachte die geltenden Lyca Mobile Registrierungs- und Nutzungsbedingungen. Support: @' + SUPPORT_USERNAME;
 const BOT_SHORT_DESCRIPTION = 'Lyca Webshop 🛍️ Triple-SIM · Bestellung · Rechnung';
 const BOT_COMMANDS = [
   { command:'start', description:'Lyca Webshop starten' },
