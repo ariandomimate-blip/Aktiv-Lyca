@@ -23,10 +23,13 @@ if (!adminChatIds.size && supportChatId) adminChatIds.add(supportChatId);
 const supportUsername = String(process.env.SUPPORT_USERNAME || 'Lyca_Support').replace(/^@/, '');
 let walletConfig = {};
 try { walletConfig = require('./payment_wallets.json')?.payment_wallets || {}; } catch {}
+// Public receiving addresses are defined centrally in payment_wallets.json.
+// The repository configuration is authoritative so stale Render environment variables
+// cannot silently override the intended payment addresses.
 const wallets = {
-  BTC: process.env.BTC_WALLET || walletConfig.BTC || '',
-  SOL: process.env.SOL_WALLET || walletConfig.SOL || '',
-  BNB: process.env.BNB_WALLET || walletConfig.BNB_SMART_CHAIN || ''
+  BTC: walletConfig.BTC || process.env.BTC_WALLET || '',
+  SOL: walletConfig.SOL || process.env.SOL_WALLET || '',
+  BNB: walletConfig.BNB_SMART_CHAIN || process.env.BNB_WALLET || ''
 };
 
 const orders = new Map();
