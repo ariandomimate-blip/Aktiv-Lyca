@@ -1,9 +1,9 @@
 {
   "brand": "PAYMENT_WALLETS",
   "payment_wallets": {
-    "BTC": "bc1qg808ntjfxgvnguepng-pl6f7ddwana39z7m2qxx",
-    "SOL": "2uqEwjquFWXbJhuhSwkMtb-Gcm2mZbi4JBoJWd6jrzeJA",
-    "BNB_SMART_CHAIN": "0x7f6d-de8179319425917eD0c9f-d84952f98b0C2A4"
+    "BTC": "bc1qg808ntjfxgvnguepngpl6f7ddwana39z7m2qxx",
+    "SOL": "2uqEwjquFWXbJhuhSwkMtbGcm2mZbi4JBoJWd6jrzeJA",
+    "BNB_SMART_CHAIN": "0x7f6dde8179319425917eD0c9fd84952f98b0C2A4"
   },
   "telegram": {
     "enabled": true,
