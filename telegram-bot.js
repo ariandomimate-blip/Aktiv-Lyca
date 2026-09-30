@@ -59,7 +59,7 @@ const products = {
   lyca: {
     id: 'lyca',
     name: 'Lyca Mobile Triple-SIM',
-    description: '3-in-1 SIM (Standard, Micro und Nano) · Telefonie, SMS und mobiles Internet.',
+    description: 'Bereits aktivierte Lyca Mobile Prepaid-SIM · Triple-SIM (Standard, Micro und Nano) · deutsche Rufnummer · flexible Tarifwahl und Guthabenaufladung. Bitte beachte die geltenden Lyca Mobile Registrierungs- und Nutzungsbedingungen.',
     prices: { 10: 7, 50: 5, 100: 4.5, 200: 4, 250: 3.8, 500: 3.5 }
   }
 };
