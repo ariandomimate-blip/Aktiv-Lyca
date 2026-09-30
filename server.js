@@ -27,6 +27,31 @@ const root = __dirname;
 // Production webshop domain. Render custom-domain DNS must point aktiv-lyca.de to this service.
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/,'');
 const REDIRECT_TO_CANONICAL = String(process.env.REDIRECT_TO_CANONICAL || 'false').toLowerCase() === 'true';
+const STATUS_API_TOKEN = String(process.env.STATUS_API_TOKEN || '').trim();
+const REQUIRE_WEBHOOK_SECRET = String(process.env.REQUIRE_WEBHOOK_SECRET || 'false').toLowerCase() === 'true';
+const rateBuckets = new Map();
+const BLOCKED_PUBLIC_FILES = new Set(['/server.js','/telegram-bot.js','/payment_wallets.json','/.env','.env.example','/package.json','/package-lock.json','/Procfile','/requirements.txt']);
+function applySecurityHeaders(res) {
+  res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Resource-Policy','same-origin');
+}
+function allowRequest(req) {
+  if (req.method === 'GET' && (req.url || '').startsWith('/health')) return true;
+  const key = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() || 'unknown';
+  const now = Date.now();
+  let bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt >= 60000) bucket = {startedAt:now,count:0};
+  bucket.count += 1; rateBuckets.set(key,bucket);
+  if (rateBuckets.size > 5000) for (const [k,v] of rateBuckets) if (now-v.startedAt >= 60000) rateBuckets.delete(k);
+  return bucket.count <= 180;
+}
+function isProtectedEndpoint(req) {
+  return String(req.url || '').split('?')[0].startsWith('/api/');
+}
 const CANONICAL_SHOP_URL = String(process.env.CANONICAL_SHOP_URL || PUBLIC_BASE_URL).replace(/\/$/,'');
 const TELEGRAM_BOT_ID = String(process.env.TELEGRAM_BOT_ID || '').trim();
 const SUPPORT_USERNAME = telegram.supportUsername;
@@ -59,7 +84,7 @@ function safePath(urlPath) {
 function parseJson(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => { body += chunk; if (body.length > 1000000) req.destroy(new Error('Payload too large')); });
+    req.on('data', chunk => { body += chunk; if (body.length > 256000) req.destroy(new Error('Payload too large')); });
     req.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(e); } });
     req.on('error', reject);
   });
@@ -300,6 +325,7 @@ async function telegramOrder(req,res) {
 }
 
 async function telegramWebhook(req,res) {
+  if (REQUIRE_WEBHOOK_SECRET && !telegram.webhookSecret) return sendJson(res,503,{ok:false,error:'Webhook secret not configured'});
   if (telegram.webhookSecret && req.headers['x-telegram-bot-api-secret-token'] !== telegram.webhookSecret) return sendJson(res,403,{ok:false,error:'Forbidden'});
   try {
     const update = await parseJson(req);
@@ -364,6 +390,8 @@ async function setupTelegram() {
 }
 
 const server = http.createServer(async (req,res) => {
+  applySecurityHeaders(res);
+  if (!allowRequest(req)) return sendJson(res,429,{ok:false,error:'Zu viele Anfragen. Bitte später erneut versuchen.'});
   const route = (req.url || '').split('?')[0];
   if (REDIRECT_TO_CANONICAL) {
     if (req.method === 'GET' && !route.startsWith('/api/')) {
@@ -377,7 +405,8 @@ const server = http.createServer(async (req,res) => {
       return res.end();
     }
   }
-  // Lightweight public health endpoint for Render and browser diagnostics.\n  if (req.method === 'GET' && route === '/health') {\n    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});\n  }\n  if (req.method === 'GET' && route === '/api/telegram-status') return telegramStatus(req,res);
+  // Lightweight public health endpoint for Render and browser diagnostics.\n  if (req.method === 'GET' && route === '/health') {\n    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});\n  }\n  if (req.method === 'GET' && route === '/api/telegram-status') { if (STATUS_API_TOKEN && req.headers['x-status-token'] !== STATUS_API_TOKEN) return sendJson(res,404,{ok:false}); return telegramStatus(req,res); }
+  if (BLOCKED_PUBLIC_FILES.has(route) || route.startsWith('/.env')) return sendJson(res,404,{ok:false,error:'Not Found'});
   if (req.method === 'GET' && route === '/api/telegram-cart') {
     const params = new URL(req.url || '/', 'http://localhost').searchParams;
     const chatId = String(params.get('chat_id') || '').trim();
