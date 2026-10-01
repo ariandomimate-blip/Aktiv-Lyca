@@ -452,7 +452,7 @@ const server = http.createServer(async (req,res) => {
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
     return res.end(html);
   }
-  if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
+  // Browser fallback: opening the webhook URL directly should show the same webshop UI as the main page.\n  // Telegram itself continues to use POST /api/telegram-webhook for webhook updates.\n  if (req.method === 'GET' && route === '/api/telegram-webhook') {\n    recordPageView();\n    return sendFile(path.join(root,'index.html'),res);\n  }\n  if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
   if (req.method === 'POST' && route === '/telegram-checkout-redirect') return telegramCheckoutRedirect(req,res);
 
