@@ -802,6 +802,41 @@ async function handleUpdate(update) {
   return sendMessage(chatId, '👋 Willkommen beim Lyca Webshop. Nutze die Schaltflächen unten, um Produkte, Warenkorb, Bestellung und Support zu öffnen.', { reply_markup: mainKeyboard() });
 }
 
+
+let pollingActive = false;
+let pollingOffset = 0;
+
+async function startPolling() {
+  if (pollingActive || !token) return;
+  pollingActive = true;
+  console.log('Lyca Telegram: Long Polling aktiviert (kein Webhook).');
+  while (pollingActive) {
+    try {
+      const result = await api('getUpdates', {
+        offset: pollingOffset,
+        timeout: 50,
+        allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages']
+      });
+      if (!result.ok) {
+        console.error('Lyca Telegram polling error:', result.description || 'getUpdates failed');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        continue;
+      }
+      for (const update of (result.result || [])) {
+        if (update.update_id != null) pollingOffset = Number(update.update_id) + 1;
+        try {
+          await handleUpdate(update);
+        } catch (err) {
+          console.error('Lyca Telegram update handling error:', err.message || err);
+        }
+      }
+    } catch (err) {
+      console.error('Lyca Telegram polling request failed:', err.message || err);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
 async function configure(baseUrl = publicBaseUrl) {
   if (!token) return { enabled: false, reason: 'TELEGRAM_BOT_TOKEN fehlt' };
   const me = await api('getMe');
@@ -817,13 +852,13 @@ async function configure(baseUrl = publicBaseUrl) {
       adminChatIds.add(resolvedSupportChatId);
     }
   } catch {}
-  if (baseUrl) {
-    const webhookUrl = `${baseUrl}/api/telegram-webhook`;
-    const body = { url: webhookUrl, allowed_updates: ['message', 'callback_query', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'], drop_pending_updates: true };
-    if (webhookSecret) body.secret_token = webhookSecret;
-    const hook = await api('setWebhook', body);
-    if (!hook.ok) return { enabled: false, reason: hook.description || 'setWebhook failed' };
+  // This bot runs in normal Telegram Bot API long-polling mode.
+  // Explicitly remove any old webhook so Telegram delivers updates to getUpdates().
+  const hook = await api('deleteWebhook', { drop_pending_updates: true });
+  if (!hook.ok) {
+    console.error('Lyca Telegram: deleteWebhook failed:', hook.description || 'unknown error');
   }
+  await startPolling();
   await api('setMyCommands', { commands: [
     { command: 'start', description: 'Shop starten' },
     { command: 'shop', description: 'Produkte öffnen' },
@@ -835,7 +870,7 @@ async function configure(baseUrl = publicBaseUrl) {
     { command: 'admin', description: 'Administrator-Panel für Lyca_Support' }
   ] });
   if (baseUrl) await api('setChatMenuButton', { menu_button: { type: 'web_app', text: '🛍️ Shop', web_app: { url: baseUrl } } });
-  return { enabled: true, username: me.result.username, webhook: `${baseUrl}/api/telegram-webhook`, businessMode: Boolean(me.result?.can_connect_to_business), canConnectToBusiness: Boolean(me.result?.can_connect_to_business), miniAppUrl: baseUrl };
+  return { enabled: true, username: me.result.username, mode: 'long-polling', webhook: null, businessMode: Boolean(me.result?.can_connect_to_business), canConnectToBusiness: Boolean(me.result?.can_connect_to_business), miniAppUrl: baseUrl };
 }
 
 module.exports = {
