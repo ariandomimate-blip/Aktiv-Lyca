@@ -442,7 +442,7 @@ async function showAdminStatus(chatId, messageId = null, actorUsername = '') {
   const text = '📡 LYCA BOT · STATUS\n\n' +
     '🤖 Bot: @' + botUsername + '\n' +
     '🔐 API: ' + (me.ok ? 'OK' : 'FEHLER') + '\n' +
-    '🪝 Webhook: ' + (hook.ok && hook.result?.url ? hook.result.url : 'nicht gesetzt') + '\n' +
+    '🌐 Shop: https://aktiv-lyca-main.onrender.com\n' +
     '📨 Warteschlange: ' + (hook.ok ? (hook.result?.pending_update_count || 0) : 'unbekannt') + '\n' +
     '🏢 Business: ' + (me.ok && me.result?.can_connect_to_business ? 'bereit' : 'nicht freigeschaltet');
   if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
