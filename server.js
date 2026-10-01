@@ -324,19 +324,6 @@ async function telegramOrder(req,res) {
   }
 }
 
-async function telegramWebhook(req,res) {
-  if (REQUIRE_WEBHOOK_SECRET && !telegram.webhookSecret) return sendJson(res,503,{ok:false,error:'Webhook secret not configured'});
-  if (telegram.webhookSecret && req.headers['x-telegram-bot-api-secret-token'] !== telegram.webhookSecret) return sendJson(res,403,{ok:false,error:'Forbidden'});
-  try {
-    const update = await parseJson(req);
-    await telegram.handleUpdate(update);
-    return sendJson(res,200,{ok:true});
-  } catch (err) {
-    console.error('Telegram webhook error:',err);
-    return sendJson(res,500,{ok:false,error:'Webhook processing failed'});
-  }
-}
-
 async function telegramStatus(req,res) {
   const d = await telegramDiagnostics();
   return sendJson(res,200,{
@@ -349,8 +336,7 @@ async function telegramStatus(req,res) {
     authenticated:d.authenticated,
     bot:d.bot,
     telegram_error:d.telegramError,
-    webhook:d.webhook,
-    webhook_url:`${PUBLIC_BASE_URL}/api/telegram-webhook`,
+    mode:'long-polling',
     invite_url:BOT_INVITE_URL(),
     shop_url:PUBLIC_BASE_URL,
     support_username:SUPPORT_USERNAME,
@@ -382,7 +368,7 @@ async function setupTelegram() {
       authenticated:diagnostics.authenticated,
       canConnectToBusiness:diagnostics.can_connect_to_business,
       botUsername:diagnostics.bot?.username || (telegram.getUsername ? telegram.getUsername() : telegram.username),
-      webhookUrl:diagnostics.webhook?.url || ''
+      mode:'long-polling'
     });
   } catch (err) {
     console.error('Telegram setup failed:',err.message || err);
