@@ -289,7 +289,6 @@ function productText() {
 }
 
 async function sendOrder(order) {
-  saveOrder(order);
   const recipients = supportAdminOnly
     ? (resolvedSupportChatId ? [resolvedSupportChatId] : [])
     : Array.from(adminChatIds);
@@ -307,6 +306,7 @@ async function sendOrder(order) {
   if (!delivered) {
     return { ok:false, error:'Die Bestellung konnte keinem Lyca-Administrator zugestellt werden.', adminRecipients:recipients.length };
   }
+  saveOrder(order);
   let customerNotified = false;
   const customerChatId = String(order.telegramChatId || '').trim();
   if (customerChatId) {
