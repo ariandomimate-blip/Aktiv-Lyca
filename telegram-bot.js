@@ -248,14 +248,26 @@ function getSession(chatId) {
 }
 function cartItems(chatId) { return getSession(chatId).cart; }
 function cartTotal(chatId) { return cartItems(chatId).reduce((sum, item) => sum + item.unitPrice * item.qty, 0); }
+function priceForQuantity(product, qty) {
+  const tiers = Object.entries(product?.prices || {}).map(([minimum, price]) => [Number(minimum), Number(price)])
+    .filter(([minimum, price]) => Number.isSafeInteger(minimum) && Number.isFinite(price) && minimum > 0)
+    .sort((a, b) => a[0] - b[0]);
+  let price = null;
+  for (const [minimum, tierPrice] of tiers) if (qty >= minimum) price = tierPrice;
+  return price;
+}
 function addToCart(chatId, productId, qty) {
   const product = products[productId];
-  const price = product?.prices?.[qty];
-  if (!product || !price) return false;
+  const requestedQty = Number(qty);
+  if (!product || !Number.isSafeInteger(requestedQty) || requestedQty < 10 || requestedQty > 5000 || requestedQty % 10 !== 0) return false;
   const cart = cartItems(chatId);
   const existing = cart.find(x => x.productId === productId);
-  if (existing) { existing.qty += qty; existing.unitPrice = price; }
-  else cart.push({ productId, name: product.name, qty, unitPrice: price });
+  const totalQty = (existing ? Number(existing.qty) || 0 : 0) + requestedQty;
+  if (totalQty > 5000) return false;
+  const price = priceForQuantity(product, totalQty);
+  if (price === null) return false;
+  if (existing) { existing.qty = totalQty; existing.unitPrice = price; }
+  else cart.push({ productId, name: product.name, qty: totalQty, unitPrice: price });
   return true;
 }
 function clearCart(chatId) { getSession(chatId).cart = []; }
