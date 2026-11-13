@@ -187,7 +187,12 @@ async function telegramCheckoutRedirect(req,res) {
     res.end(html);
   } catch (err) {
     console.error('Lyca checkout redirect error:',err);
-    sendJson(res, Number(err.statusCode)||400, {ok:false,error:err.message||'Bestellung konnte nicht verarbeitet werden.'});
+    const status = Number(err.statusCode) || 400;
+    const message = String(err.message || 'Bestellung konnte nicht verarbeitet werden.')
+      .replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const html = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Bestellung nicht abgeschlossen</title><style>body{margin:0;background:#080d14;color:#f5f7fb;font-family:system-ui;display:grid;place-items:center;min-height:100vh;padding:22px;box-sizing:border-box}.card{width:min(520px,100%);padding:28px;border:1px solid #344253;border-radius:20px;background:#111a24;box-sizing:border-box}p{color:#c4ceda;line-height:1.55}a{display:inline-block;margin-top:14px;padding:12px 18px;border-radius:12px;background:#77e6d0;color:#06110f;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Bestellung nicht abgeschlossen</h1><p>' + message + '</p><p>Es wurde keine Bestellung als erfolgreich bestätigt.</p><a href="/">Zurück zum Lyca-Shop</a></main></body></html>';
+    res.writeHead(status, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+    res.end(html);
   }
 }
 function sendJson(res, status, payload) {
