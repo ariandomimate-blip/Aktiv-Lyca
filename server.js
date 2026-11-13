@@ -362,7 +362,7 @@ async function telegramStatus(req,res) {
     authenticated:d.authenticated,
     bot:d.bot,
     telegram_error:d.telegramError,
-    mode:'long-polling',
+    mode:telegram.webhookSecret?'webhook':'long-polling',
     invite_url:BOT_INVITE_URL(),
     shop_url:PUBLIC_BASE_URL,
     support_username:SUPPORT_USERNAME,
@@ -394,7 +394,7 @@ async function setupTelegram() {
       authenticated:diagnostics.authenticated,
       canConnectToBusiness:diagnostics.can_connect_to_business,
       botUsername:diagnostics.bot?.username || (telegram.getUsername ? telegram.getUsername() : telegram.username),
-      mode:'long-polling'
+      mode:telegram.webhookSecret?'webhook':'long-polling'
     });
   } catch (err) {
     console.error('Telegram setup failed:',err.message || err);
