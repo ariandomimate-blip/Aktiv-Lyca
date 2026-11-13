@@ -334,6 +334,22 @@ async function telegramOrder(req,res) {
   }
 }
 
+async function telegramWebhook(req,res) {
+  const supplied = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+  if (!telegram.webhookSecret || supplied !== telegram.webhookSecret) {
+    return sendJson(res,403,{ok:false,error:'Ungültiges Telegram-Webhook-Secret.'});
+  }
+  try {
+    const update = await parseJson(req);
+    if (!update || typeof update.update_id !== 'number') return sendJson(res,400,{ok:false,error:'Ungültiges Telegram-Update.'});
+    await telegram.handleUpdate(update);
+    return sendJson(res,200,{ok:true});
+  } catch (err) {
+    console.error('Lyca Telegram webhook update failed:',err.message || err);
+    return sendJson(res,400,{ok:false,error:'Telegram-Update konnte nicht verarbeitet werden.'});
+  }
+}
+
 async function telegramStatus(req,res) {
   const d = await telegramDiagnostics();
   return sendJson(res,200,{
