@@ -106,6 +106,23 @@ function parseUrlEncoded(req) {
   });
 }
 
+function normalizeLycaOrderItems(items) {
+  if (!Array.isArray(items) || items.length !== 1) {
+    throw new Error('Bitte ausschließlich das Lyca Mobile Triple-SIM Produkt bestellen.');
+  }
+  const qty = Number(items[0]?.qty);
+  if (!Number.isSafeInteger(qty) || qty < 10 || qty > 5000 || qty % 10 !== 0) {
+    throw new Error('Die Bestellmenge muss zwischen 10 und 5.000 Stück liegen und in 10er-Schritten angegeben werden.');
+  }
+  const price = qty >= 500 ? 3.50
+    : qty >= 250 ? 3.80
+    : qty >= 200 ? 4.00
+    : qty >= 100 ? 4.50
+    : qty >= 50 ? 5.00
+    : 7.00;
+  return [{ name: 'Lyca Mobile Triple-SIM', qty, price }];
+}
+
 async function createTelegramOrder(data) {
   const customer = data.customer || {
     name: String(data.customer_name || '').trim(),
@@ -123,16 +140,9 @@ async function createTelegramOrder(data) {
     throw err;
   }
   const verifiedBotUsername = String(diagnostics.bot.username).replace(/^@/,'').trim();
-  const requestedOrderNumber = String(data.order_number || '').trim();
-  const orderNumber = /^LYCA-\d{8}-[A-F0-9]{6}$/i.test(requestedOrderNumber)
-    ? requestedOrderNumber.toUpperCase()
-    : makeOrderNumber();
+  const orderNumber = makeOrderNumber();
   const invoiceNumber = makeInvoiceNumber(orderNumber);
-  const normalizedItems = items.map(x => ({
-    name:String(x.name || 'Lyca Mobile Triple-SIM'),
-    qty:Math.max(1,Number(x.qty)||1),
-    price:Math.max(0,Number(x.price)||0)
-  }));
+  const normalizedItems = normalizeLycaOrderItems(items);
   const total = normalizedItems.reduce((sum,x) => sum + x.price*x.qty,0);
   const order = {
     orderNumber, invoiceNumber,
@@ -273,16 +283,9 @@ async function telegramOrder(req,res) {
       });
     }
     const verifiedBotUsername = String(diagnostics.bot.username).replace(/^@/,'').trim();
-    const requestedOrderNumber = String(data.order_number || '').trim();
-    const orderNumber = /^LYCA-\d{8}-[A-F0-9]{6}$/i.test(requestedOrderNumber)
-      ? requestedOrderNumber.toUpperCase()
-      : makeOrderNumber();
+    const orderNumber = makeOrderNumber();
     const invoiceNumber = makeInvoiceNumber(orderNumber);
-    const normalizedItems = items.map(x => ({
-      name:String(x.name || 'Lyca Mobile Triple-SIM'),
-      qty:Math.max(1,Number(x.qty)||1),
-      price:Math.max(0,Number(x.price)||0)
-    }));
+    const normalizedItems = normalizeLycaOrderItems(items);
     const total = normalizedItems.reduce((sum,x) => sum + x.price*x.qty,0);
     const order = {
       orderNumber, invoiceNumber,
