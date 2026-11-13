@@ -158,6 +158,7 @@ async function createTelegramOrder(data) {
     paymentStatus:'UNBEZAHLT'
   };
   const result = await telegram.sendOrder(order);
+  if (!result?.ok || !result.adminRecipients) { const err = new Error(result?.error || 'Bestellung konnte nicht an Lyca_Support zugestellt werden.'); err.statusCode = 503; throw err; }
   const invoiceText = formatInvoice(order);
   const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
   const verifiedBotUrl = `https://t.me/${verifiedBotUsername}?start=${encodeURIComponent(orderNumber)}`;
@@ -301,6 +302,7 @@ async function telegramOrder(req,res) {
       paymentStatus:'UNBEZAHLT'
     };
     const result = await telegram.sendOrder(order);
+    if (!result?.ok || !result.adminRecipients) { const err = new Error(result?.error || 'Bestellung konnte nicht an Lyca_Support zugestellt werden.'); err.statusCode = 503; throw err; }
     const invoiceText = formatInvoice(order);
     const supportUrl = result.supportUrl || `${SUPPORT_URL}?text=${encodeURIComponent(invoiceText)}`;
     // Always build the customer handoff from the username verified by getMe().
@@ -323,7 +325,7 @@ async function telegramOrder(req,res) {
     });
   } catch (err) {
     console.error('Lyca order error:',err);
-    return sendJson(res,500,{error:err.message || 'Bestellung konnte nicht verarbeitet werden.'});
+    return sendJson(res,Number(err.statusCode)||500,{error:err.message || 'Bestellung konnte nicht verarbeitet werden.'});
   }
 }
 
