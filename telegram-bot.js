@@ -293,11 +293,19 @@ async function sendOrder(order) {
   const recipients = supportAdminOnly
     ? (resolvedSupportChatId ? [resolvedSupportChatId] : [])
     : Array.from(adminChatIds);
+  if (!recipients.length) {
+    return { ok:false, error:'Lyca_Support ist nicht als Telegram-Admin-Chat konfiguriert.', adminRecipients:0 };
+  }
+  let delivered = 0;
   for (const chatId of recipients) {
     try {
       const result = await sendMessage(chatId, formatOrder(order), { reply_markup: adminOrderKeyboard(order) });
-      if (!result.ok) console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
+      if (result.ok) delivered++;
+      else console.error(`Lyca Bot: failed to notify admin ${chatId}: ${result.description || 'unknown Telegram error'}`);
     } catch (err) { console.error(`Lyca Bot: failed to notify admin ${chatId}`, err.message); }
+  }
+  if (!delivered) {
+    return { ok:false, error:'Die Bestellung konnte keinem Lyca-Administrator zugestellt werden.', adminRecipients:recipients.length };
   }
   let customerNotified = false;
   const customerChatId = String(order.telegramChatId || '').trim();
@@ -309,7 +317,7 @@ async function sendOrder(order) {
     customerNotified = Boolean(result.ok);
     await sendWalletQRCodes(customerChatId, order);
   }
-  return { ok: true, orderNumber: order.orderNumber, botUsername, message: formatOrder(order), adminRecipients: recipients.length, customerNotified, invoiceUrl: botOrderUrl(order.orderNumber), supportUrl: supportUrl(order) };
+  return { ok:true, orderNumber:order.orderNumber, botUsername, message:formatOrder(order), adminRecipients:delivered, customerNotified, invoiceUrl:botOrderUrl(order.orderNumber), supportUrl:supportUrl(order) };
 }
 
 function businessReplyText(text) {
