@@ -815,7 +815,15 @@ async function handleUpdate(update) {
     return showHome(chatId);
   }
   if (command === '/myid') return sendMessage(chatId, `🆔 Deine Telegram Chat-ID: ${chatId}`, { reply_markup: mainKeyboard() });
-  if (command === '/shop') return showProducts(chatId);
+  if (command === '/shop' || command === '/products') return showProducts(chatId);
+  if (command === '/cart') return showCart(chatId);
+  if (command === '/orders') return showOrders(chatId);
+  if (command === '/wallets') return sendWalletQRCodes(chatId, null);
+  if (command === '/cancel') {
+    session.checkout = null;
+    session.pendingPaymentOrder = null;
+    return sendMessage(chatId, '↩️ Vorgang abgebrochen. Du kannst jederzeit neu starten.', { reply_markup: mainKeyboard() });
+  }
   if (command === '/support') return sendMessage(chatId, `💬 LYCA SUPPORT\n\n@${supportUsername}`, { reply_markup: mainKeyboard() });
   if (command === '/order') {
     const order = getOrder(parts[1]);
