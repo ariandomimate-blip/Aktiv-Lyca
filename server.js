@@ -233,7 +233,12 @@ const BOT_COMMANDS = [
   { command:'cart', description:'Warenkorb anzeigen' },
   { command:'orders', description:'Bestellungen anzeigen' },
   { command:'shop', description:'Webshop öffnen' },
+  { command:'order', description:'Bestellung mit Nummer anzeigen' },
+  { command:'invoice', description:'Rechnung anzeigen' },
+  { command:'wallets', description:'Zahlungs-Wallets und QR-Codes' },
   { command:'support', description:'Support kontaktieren' },
+  { command:'myid', description:'Telegram Chat-ID anzeigen' },
+  { command:'admin', description:'Lyca Support Admin-Panel' },
   { command:'cancel', description:'Vorgang abbrechen' }
 ];
 
