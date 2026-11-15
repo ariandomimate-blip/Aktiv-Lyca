@@ -235,8 +235,16 @@ async function api(method, body = {}) {
     return r.json();
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
-async function sendMessage(chatId, text, extra = {}) { return api('sendMessage', { chat_id: chatId, text, ...extra }); }
-async function sendBusinessMessage(connectionId, chatId, text, extra = {}) { return api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra }); }
+async function sendMessage(chatId, text, extra = {}) {
+  const result = await api('sendMessage', { chat_id: chatId, text, ...extra });
+  if (!result.ok) console.error('Lyca Telegram sendMessage failed:', result.error_code || '', result.description || 'unknown Telegram API error');
+  return result;
+}
+async function sendBusinessMessage(connectionId, chatId, text, extra = {}) {
+  const result = await api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra });
+  if (!result.ok) console.error('Lyca Telegram sendBusinessMessage failed:', result.error_code || '', result.description || 'unknown Telegram API error');
+  return result;
+}
 async function editMessage(chatId, messageId, text, replyMarkup) { return api('editMessageText', { chat_id: chatId, message_id: messageId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }); }
 
 function saveOrder(order) { orders.set(order.orderNumber, order); return order; }
@@ -614,7 +622,11 @@ async function handleCallback(q) {
 }
 
 async function handleUpdate(update) {
-  if (update.update_id != null && !rememberOnce(seenUpdateIds, update.update_id, 10 * 60 * 1000)) return;
+  if (update.update_id != null && !rememberOnce(seenUpdateIds, update.update_id, 10 * 60 * 1000)) {
+    console.log('Lyca Telegram duplicate update ignored:', update.update_id);
+    return;
+  }
+  console.log('Lyca Telegram update received:', update.update_id, update.message ? 'message' : update.callback_query ? 'callback_query' : update.business_message ? 'business_message' : update.business_connection ? 'business_connection' : 'other');
   if (update.business_connection) { await handleBusinessConnection(update.business_connection); return; }
   if (update.business_message) { await handleBusinessMessage(update.business_message); return; }
   if (update.edited_business_message || update.deleted_business_messages) return;
