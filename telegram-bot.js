@@ -8,7 +8,7 @@ const token = telegramServiceEnabled ? String(
 ).trim() : '';
 
 let botUsername = String(process.env.TELEGRAM_BOT_USERNAME || 'Lyca_Webshop1_Bot').replace(/^@/, '');
-const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/,'');
+const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || 'https://aktiv-lyca-rnmc.onrender.com').replace(/\/$/,'');
 const webhookSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const adminChatIds = new Set(String(process.env.TELEGRAM_ADMIN_CHAT_IDS || process.env.TELEGRAM_ADMIN_CHAT_ID || '').split(',').map(x => x.trim()).filter(Boolean));
 const supportChatId = String(process.env.TELEGRAM_SUPPORT_CHAT_ID || '').trim();
@@ -470,7 +470,7 @@ async function showAdminStatus(chatId, messageId = null, actorUsername = '') {
   const text = '📡 LYCA BOT · STATUS\n\n' +
     '🤖 Bot: @' + botUsername + '\n' +
     '🔐 API: ' + (me.ok ? 'OK' : 'FEHLER') + '\n' +
-    '🌐 Shop: https://aktiv-lyca-main.onrender.com\n' +
+    '🌐 Shop: https://aktiv-lyca-rnmc.onrender.com\n' +
     '📨 Warteschlange: ' + (hook.ok ? (hook.result?.pending_update_count || 0) : 'unbekannt') + '\n' +
     '🏢 Business: ' + (me.ok && me.result?.can_connect_to_business ? 'bereit' : 'nicht freigeschaltet');
   if (messageId) return editMessage(chatId, messageId, text, adminPanelKeyboard());
