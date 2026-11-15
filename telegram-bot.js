@@ -894,7 +894,10 @@ async function configure(baseUrl = publicBaseUrl) {
   } catch {}
   // Prefer a secured Telegram webhook in production. This prevents getUpdates
   // conflicts when an old Render service or another worker still polls this bot.
-  if (webhookSecret && baseUrl) {
+  // Temporary reliability fallback: use Telegram getUpdates long polling when explicitly enabled.
+  // This bypasses webhook delivery while preserving message and business update handlers.
+  const forcePolling = String(process.env.TELEGRAM_FORCE_POLLING || '').toLowerCase() === 'true';
+  if (webhookSecret && baseUrl && !forcePolling) {
     const webhookUrl = baseUrl.replace(/\/$/, '') + '/api/telegram-webhook';
     const hook = await api('setWebhook', {
       url: webhookUrl,
