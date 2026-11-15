@@ -235,17 +235,22 @@ async function api(method, body = {}) {
     return r.json();
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
+const SIM_NOTICE = '📱 Bereits aktivierte Lyca Mobile SIM-Karten · Nutzung nur nach gesetzlich vorgeschriebener Identitätsprüfung und Registrierung.';
+function addSimNotice(text) {
+  const value = String(text || '');
+  return value.includes(SIM_NOTICE) ? value : value + '\n\n' + SIM_NOTICE;
+}
 async function sendMessage(chatId, text, extra = {}) {
-  const result = await api('sendMessage', { chat_id: chatId, text, ...extra });
+  const result = await api('sendMessage', { chat_id: chatId, text: addSimNotice(text), ...extra });
   if (!result.ok) console.error('Lyca Telegram sendMessage failed:', result.error_code || '', result.description || 'unknown Telegram API error');
   return result;
 }
 async function sendBusinessMessage(connectionId, chatId, text, extra = {}) {
-  const result = await api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text, ...extra });
+  const result = await api('sendMessage', { business_connection_id: connectionId, chat_id: chatId, text: addSimNotice(text), ...extra });
   if (!result.ok) console.error('Lyca Telegram sendBusinessMessage failed:', result.error_code || '', result.description || 'unknown Telegram API error');
   return result;
 }
-async function editMessage(chatId, messageId, text, replyMarkup) { return api('editMessageText', { chat_id: chatId, message_id: messageId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }); }
+async function editMessage(chatId, messageId, text, replyMarkup) { return api('editMessageText', { chat_id: chatId, message_id: messageId, text: addSimNotice(text), ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }); }
 
 function saveOrder(order) { orders.set(order.orderNumber, order); return order; }
 function getOrder(id) { return orders.get(String(id || '').trim()) || null; }
