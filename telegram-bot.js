@@ -235,7 +235,7 @@ async function api(method, body = {}) {
     return r.json();
   } catch (err) { return { ok: false, description: err.message || 'Telegram request failed' }; }
 }
-const SIM_NOTICE = '📱 Aktivierte und ordnungsgemäß registrierte Lyca Prepaid SIM-Karten';
+const SIM_NOTICE = '📱 Aktivierte und registrierte Lyca Prepaid SIM-Karten';
 function addSimNotice(text) {
   const value = String(text || '');
   return value.includes(SIM_NOTICE) ? value : SIM_NOTICE + '\n\n' + value;
