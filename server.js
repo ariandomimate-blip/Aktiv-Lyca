@@ -40,6 +40,9 @@ function applySecurityHeaders(res) {
   res.setHeader('Cross-Origin-Resource-Policy','same-origin');
 }
 function allowRequest(req) {
+  // Telegram retries webhook deliveries from shared IP ranges. Do not rate-limit
+  // the signed webhook endpoint; authenticate it with Telegram's secret header instead.
+  if (req.method === 'POST' && (req.url || '').split('?')[0] === '/api/telegram-webhook') return true;
   if (req.method === 'GET' && (req.url || '').startsWith('/health')) return true;
   const key = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() || 'unknown';
   const now = Date.now();
@@ -337,15 +340,22 @@ async function telegramOrder(req,res) {
 async function telegramWebhook(req,res) {
   const supplied = String(req.headers['x-telegram-bot-api-secret-token'] || '');
   if (!telegram.webhookSecret || supplied !== telegram.webhookSecret) {
+    console.warn('Lyca Telegram webhook rejected: secret missing or mismatched');
     return sendJson(res,403,{ok:false,error:'Ungültiges Telegram-Webhook-Secret.'});
   }
   try {
     const update = await parseJson(req);
     if (!update || typeof update.update_id !== 'number') return sendJson(res,400,{ok:false,error:'Ungültiges Telegram-Update.'});
-    await telegram.handleUpdate(update);
-    return sendJson(res,200,{ok:true});
+    const updateType = update.message ? 'message' : update.callback_query ? 'callback_query' : update.business_message ? 'business_message' : update.business_connection ? 'business_connection' : 'other';
+    console.log('Lyca Telegram webhook received:', update.update_id, updateType);
+    // Acknowledge Telegram immediately after the signed payload is parsed. Bot
+    // replies run asynchronously so a slow Telegram API call cannot cause retries.
+    sendJson(res,200,{ok:true});
+    Promise.resolve().then(() => telegram.handleUpdate(update)).catch(err => {
+      console.error('Lyca Telegram webhook handler failed:', update.update_id, err.message || err);
+    });
   } catch (err) {
-    console.error('Lyca Telegram webhook update failed:',err.message || err);
+    console.error('Lyca Telegram webhook parse failed:',err.message || err);
     return sendJson(res,400,{ok:false,error:'Telegram-Update konnte nicht verarbeitet werden.'});
   }
 }
@@ -394,7 +404,9 @@ async function setupTelegram() {
       authenticated:diagnostics.authenticated,
       canConnectToBusiness:diagnostics.can_connect_to_business,
       botUsername:diagnostics.bot?.username || (telegram.getUsername ? telegram.getUsername() : telegram.username),
-      mode:telegram.webhookSecret?'webhook':'long-polling'
+      mode:telegram.webhookSecret?'webhook':'long-polling',
+      webhook:diagnostics.webhook,
+      webhookError:diagnostics.webhookError
     });
   } catch (err) {
     console.error('Telegram setup failed:',err.message || err);
