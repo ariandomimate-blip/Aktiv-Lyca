@@ -25,7 +25,7 @@ const telegram = require('./telegram-bot');
 const port = Number(process.env.PORT) || 10000;
 const root = __dirname;
 // Production webshop domain. Render custom-domain DNS must point aktiv-lyca.de to this service.
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://webshop-sim-1.onrender.com').replace(/\/$/,'');
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://aktiv-lyca-rnmc.onrender.com').replace(/\/$/,'');
 const REDIRECT_TO_CANONICAL = String(process.env.REDIRECT_TO_CANONICAL || 'false').toLowerCase() === 'true';
 const STATUS_API_TOKEN = String(process.env.STATUS_API_TOKEN || '').trim();
 const REQUIRE_WEBHOOK_SECRET = String(process.env.REQUIRE_WEBHOOK_SECRET || 'false').toLowerCase() === 'true';
