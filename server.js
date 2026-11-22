@@ -438,7 +438,11 @@ const server = http.createServer(async (req,res) => {
       return res.end();
     }
   }
-  // Lightweight public health endpoint for Render and browser diagnostics.\n  if (req.method === 'GET' && route === '/health') {\n    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});\n  }\n  if (req.method === 'GET' && route === '/api/telegram-status') { if (STATUS_API_TOKEN && req.headers['x-status-token'] !== STATUS_API_TOKEN) return sendJson(res,404,{ok:false}); return telegramStatus(req,res); }
+  // Lightweight public health endpoint for Render and browser diagnostics.
+  if (req.method === 'GET' && route === '/health') {
+    return sendJson(res,200,{ok:true,service:'Aktiv-Lyca',timestamp:new Date().toISOString()});
+  }
+  if (req.method === 'GET' && route === '/api/telegram-status') { if (STATUS_API_TOKEN && req.headers['x-status-token'] !== STATUS_API_TOKEN) return sendJson(res,404,{ok:false}); return telegramStatus(req,res); }
   if (BLOCKED_PUBLIC_FILES.has(route) || route.startsWith('/.env')) return sendJson(res,404,{ok:false,error:'Not Found'});
   if (req.method === 'GET' && route === '/api/telegram-cart') {
     const params = new URL(req.url || '/', 'http://localhost').searchParams;
@@ -485,7 +489,13 @@ const server = http.createServer(async (req,res) => {
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
     return res.end(html);
   }
-  // Browser fallback: opening the webhook URL directly should show the same webshop UI as the main page.\n  // Telegram itself continues to use POST /api/telegram-webhook for webhook updates.\n  if (req.method === 'GET' && route === '/api/telegram-webhook') {\n    recordPageView();\n    return sendFile(path.join(root,'index.html'),res);\n  }\n  if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
+  // Browser fallback: opening the webhook URL directly should show the same webshop UI as the main page.
+  // Telegram itself continues to use POST /api/telegram-webhook for webhook updates.
+  if (req.method === 'GET' && route === '/api/telegram-webhook') {
+    recordPageView();
+    return sendFile(path.join(root,'index.html'),res);
+  }
+  if (req.method === 'POST' && route === '/api/telegram-webhook') return telegramWebhook(req,res);
   if (req.method === 'POST' && route === '/api/telegram-order') return telegramOrder(req,res);
   if (req.method === 'POST' && route === '/telegram-checkout-redirect') return telegramCheckoutRedirect(req,res);
 
