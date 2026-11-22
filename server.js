@@ -348,20 +348,24 @@ async function telegramWebhook(req,res) {
     console.warn('Lyca Telegram webhook rejected: secret missing or mismatched');
     return sendJson(res,403,{ok:false,error:'Ungültiges Telegram-Webhook-Secret.'});
   }
+  let update;
   try {
-    const update = await parseJson(req);
+    update = await parseJson(req);
     if (!update || typeof update.update_id !== 'number') return sendJson(res,400,{ok:false,error:'Ungültiges Telegram-Update.'});
-    const updateType = update.message ? 'message' : update.callback_query ? 'callback_query' : update.business_message ? 'business_message' : update.business_connection ? 'business_connection' : 'other';
-    console.log('Lyca Telegram webhook received:', update.update_id, updateType);
-    // Acknowledge Telegram immediately after the signed payload is parsed. Bot
-    // replies run asynchronously so a slow Telegram API call cannot cause retries.
-    sendJson(res,200,{ok:true});
-    Promise.resolve().then(() => telegram.handleUpdate(update)).catch(err => {
-      console.error('Lyca Telegram webhook handler failed:', update.update_id, err.message || err);
-    });
   } catch (err) {
     console.error('Lyca Telegram webhook parse failed:',err.message || err);
     return sendJson(res,400,{ok:false,error:'Telegram-Update konnte nicht verarbeitet werden.'});
+  }
+  const updateType = update.message ? 'message' : update.callback_query ? 'callback_query' : update.business_message ? 'business_message' : update.business_connection ? 'business_connection' : 'other';
+  console.log('Lyca Telegram webhook received:', update.update_id, updateType);
+  try {
+    // Process the update before acknowledging it. A 200 response now means the
+    // bot actually handled the command; failures return 500 so Telegram retries.
+    await telegram.handleUpdate(update);
+    return sendJson(res,200,{ok:true});
+  } catch (err) {
+    console.error('Lyca Telegram webhook handler failed:', update.update_id, err.message || err);
+    return sendJson(res,500,{ok:false,error:'Telegram-Update konnte nicht verarbeitet werden.'});
   }
 }
 
