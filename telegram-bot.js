@@ -897,12 +897,15 @@ async function configure(baseUrl = publicBaseUrl) {
       adminChatIds.add(resolvedSupportChatId);
     }
   } catch {}
-  // Prefer a secured Telegram webhook in production. This prevents getUpdates
-  // conflicts when an old Render service or another worker still polls this bot.
-  // Temporary reliability fallback: use Telegram getUpdates long polling when explicitly enabled.
-  // This bypasses webhook delivery while preserving message and business update handlers.
-  const forcePolling = !(webhookSecret && baseUrl); // Prefer the authenticated webhook in production; use polling only when webhook configuration is unavailable.
-  if (webhookSecret && baseUrl && !forcePolling) {
+  // Production must use one authenticated webhook endpoint. Never silently fall
+  // back to getUpdates in production: overlapping workers/redeploys can compete
+  // for updates and cause Telegram's "terminated by other getUpdates request".
+  const production = process.env.NODE_ENV === 'production' || /\.onrender\.com$/i.test(String(baseUrl || ''));
+  if (production && (!webhookSecret || !baseUrl)) {
+    return { enabled:false, reason:'Produktions-Webhook nicht vollständig konfiguriert: TELEGRAM_WEBHOOK_SECRET und PUBLIC_BASE_URL sind erforderlich. Long Polling bleibt deaktiviert.' };
+  }
+  const useWebhook = Boolean(webhookSecret && baseUrl);
+  if (useWebhook) {
     const webhookUrl = baseUrl.replace(/\/$/, '') + '/api/telegram-webhook';
     const hook = await api('setWebhook', {
       url: webhookUrl,
