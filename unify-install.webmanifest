@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "Aktiv Lyca",
+  "short_name": "Aktiv Lyca",
+  "description": "Aktiv Lyca – installierbare Web-App und ULTIMA Unify-Zugang",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101827",
+  "theme_color": "#101827",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%23101827%22%2F%3E%3Cpath%20d%3D%22M256%2070%20410%20160v192L256%20442%20102%20352V160z%22%20fill%3D%22none%22%20stroke%3D%22%2312b886%22%20stroke-width%3D%2228%22%2F%3E%3Ccircle%20cx%3D%22256%22%20cy%3D%22256%22%20r%3D%2268%22%20fill%3D%22%2312b886%22%2F%3E%3Cpath%20d%3D%22M256%20166v180M166%20256h180%22%20stroke%3D%22%23101827%22%20stroke-width%3D%2222%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%23101827%22%2F%3E%3Cpath%20d%3D%22M256%2070%20410%20160v192L256%20442%20102%20352V160z%22%20fill%3D%22none%22%20stroke%3D%22%2312b886%22%20stroke-width%3D%2228%22%2F%3E%3Ccircle%20cx%3D%22256%22%20cy%3D%22256%22%20r%3D%2268%22%20fill%3D%22%2312b886%22%2F%3E%3Cpath%20d%3D%22M256%20166v180M166%20256h180%22%20stroke%3D%22%23101827%22%20stroke-width%3D%2222%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
